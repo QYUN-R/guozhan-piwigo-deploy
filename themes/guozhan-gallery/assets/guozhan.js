@@ -458,7 +458,7 @@
       featuredScore: 1000 - orderIndex,
       downloadScore: (orderIndex * 17 + data.prefix.charCodeAt(0)) % 100,
       hotScore: (orderIndex * 31 + data.name.length * 5) % 100,
-      newestScore: 1000 - orderIndex,
+      newestScore: orderIndex,
       meta: data.parent + " / " + data.name + " / " + tag
     };
   }
@@ -559,6 +559,8 @@
     document.querySelectorAll("[data-category-desc]").forEach((node) => { node.textContent = data.desc; });
 
     const filterRow = document.querySelector("[data-filter-group]");
+    const sortSelect = document.querySelector("[data-sort-select]");
+    let activeSort = sortSelect ? sortSelect.value || "custom" : "custom";
     if (filterRow) {
       filterRow.innerHTML = filters.map((label, index) => '<button class="filter-chip" type="button" aria-pressed="' + (index === 0 ? "true" : "false") + '" data-filter>' + label + '</button>').join("");
     }
@@ -574,9 +576,16 @@
     function update() {
       const active = filterRow ? filterRow.querySelector('[data-filter][aria-pressed="true"]')?.textContent.trim() : "全部";
       const filtered = active && active !== "全部" ? allWorks.filter((item) => item.tag === active) : allWorks;
-      pager.setItems(filtered);
+      pager.setItems(sortedWorks(filtered, activeSort));
       const status = document.querySelector("[data-filter-status]");
       if (status) status.textContent = "当前查看：" + (active || "全部");
+    }
+
+    if (sortSelect) {
+      sortSelect.addEventListener("change", () => {
+        activeSort = sortSelect.value || "custom";
+        update();
+      });
     }
 
     if (filterRow) {
