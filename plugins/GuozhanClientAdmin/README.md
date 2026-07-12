@@ -13,6 +13,8 @@ Piwigo 16.4 compatible customer administration plugin for 图物计划国展素�
 - Brand/contact config: Piwigo config key `gzca_config`
 - Logo and QR files: `_data/guozhan-client-admin/`
 
+The repository does not include installed Piwigo database rows or runtime uploads. On a fresh test site, enable this plugin, sync the category contract, then use the admin setup action to import the 8 bundled sample works into real Piwigo image records.
+
 ## Public API
 
 - `gzca.categories.getList`

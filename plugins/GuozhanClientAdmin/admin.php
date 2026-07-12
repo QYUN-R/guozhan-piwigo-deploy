@@ -28,6 +28,24 @@ if ('seed_categories' === $action)
     : '前台 10 个大板块和 29 个子板块已经存在，39 个可上传位置已同步，客户修改的名称与排序已保留。';
 }
 
+if ('import_sample_works' === $action)
+{
+  $sample_errors = array();
+  $result = gzca_import_sample_works($sample_errors);
+  if ($result['created'] > 0)
+  {
+    $page['infos'][] = '已导入 '.$result['created'].' 张本地样例作品，可直接在前台检查作品列表、详情和比赛筛选。';
+  }
+  if ($result['skipped'] > 0)
+  {
+    $page['infos'][] = '已有 '.$result['skipped'].' 张样例作品，已跳过重复导入。';
+  }
+  foreach ($sample_errors as $sample_error)
+  {
+    $page['errors'][] = $sample_error;
+  }
+}
+
 if ('upload_works' === $action)
 {
   $album_id = isset($_POST['album_id']) ? (int)$_POST['album_id'] : 0;
@@ -419,6 +437,7 @@ $active_competition_media = array_values(array_filter($competition_media, functi
   return 'active' === $item['status'];
 }));
 $database_health = gzca_database_health();
+$sample_works_status = gzca_sample_works_status();
 
 $stats = array();
 list($stats['works']) = pwg_db_fetch_row(pwg_query('SELECT COUNT(*) FROM '.IMAGES_TABLE.';'));
@@ -427,9 +446,13 @@ list($stats['offline']) = pwg_db_fetch_row(pwg_query('SELECT COUNT(*) FROM '.IMA
 $stats['categories'] = count(array_filter($categories, function ($category) {
   return empty($category['id_uppercat']);
 }));
-list($stats['competition']) = pwg_db_fetch_row(pwg_query('SELECT COUNT(*) FROM '.GZCA_WORKS_TABLE.' WHERE competition_medium_id IS NOT NULL;'));
+$stats['competition'] = 0;
+if (!empty($database_health['works_table']))
+{
+  list($stats['competition']) = pwg_db_fetch_row(pwg_query('SELECT COUNT(*) FROM '.GZCA_WORKS_TABLE.' WHERE competition_medium_id IS NOT NULL;'));
+}
 
-$recent_rows = query2array('
+$recent_rows = !empty($database_health['works_table']) ? query2array('
 SELECT
     i.*,
     gw.code AS gzca_code,
@@ -458,7 +481,7 @@ SELECT
     LEFT JOIN '.CATEGORIES_TABLE.' AS c ON c.id = ic.category_id
   ORDER BY i.id DESC
   LIMIT 6
-;');
+;') : array();
 $recent_works = array_map('gzca_prepare_work_row', $recent_rows);
 
 $works = array();
@@ -611,6 +634,7 @@ $template->assign(array(
   'GZCA_IS_CUSTOMER_ADMIN' => gzca_is_customer_admin(),
   'GZCA_STATS' => $stats,
   'GZCA_DATABASE_HEALTH' => $database_health,
+  'GZCA_SAMPLE_WORKS_STATUS' => $sample_works_status,
   'GZCA_RECENT_WORKS' => $recent_works,
   'GZCA_CATEGORIES' => $categories,
   'GZCA_CATEGORY_OPTIONS' => $category_options,

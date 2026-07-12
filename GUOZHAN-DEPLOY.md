@@ -16,8 +16,8 @@ This is a complete Piwigo 16.4.0 test project with:
 4. Log in to Piwigo admin and enable plugin `GuozhanClientAdmin`.
 5. Enable theme `guozhan-gallery` and set it as the default theme.
 6. Open the Guozhan admin page and run/check category contract sync.
-7. Check health status: database tables, category contract, upload contract, WebService, frontend sync and active theme should all be normal.
-8. Upload test works to normal categories, direct-upload categories, reserved exhibition categories and competition media.
+7. Use `Import sample works` to write the 8 bundled locally generated sample images into Piwigo as real gallery works, or upload your own test works.
+8. Check health status: database tables, category contract, upload contract, WebService, frontend sync and active theme should all be normal.
 9. Check frontend pages: home, categories, competition, search, detail and contact.
 
 ## Existing Piwigo Merge
@@ -28,6 +28,8 @@ This is a complete Piwigo 16.4.0 test project with:
 4. Enable the plugin and theme, then run category contract sync.
 5. Do not overwrite existing server `local/config`, `_data`, `upload` or `galleries` unless this is a fresh test site.
 
+The GitHub repository intentionally excludes server runtime data such as the installed database, uploaded originals and generated derivatives. For a fresh test site, finish the installer first, then import the bundled sample works from the Guozhan admin page.
+
 ## Completed Integration
 
 - 10 top-level frontend sections and 29 child sections.
@@ -36,6 +38,7 @@ This is a complete Piwigo 16.4.0 test project with:
 - Brand and contact UI uses `gzca.contact.get`.
 - List cards prefer `thumbnail_url`; detail page prefers `display_url`.
 - Admin upload, category, exhibition, works, competition and contact functions are covered.
+- Admin can import 8 bundled sample works into Piwigo storage/database for first server testing.
 
 ## Local Validation
 

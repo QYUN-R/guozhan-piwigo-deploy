@@ -49,6 +49,11 @@
         <span><strong>同步前台目录</strong><small>建立 10 个大板块、29 个子板块和稳定标识；重复执行不会覆盖客户改过的名称与排序。</small></span>
         <button class="gzca-button gzca-button-quiet" type="submit">建立前端对应分类</button>
       </form>
+      <form class="gzca-setup-bar" action="{$GZCA_URLS.dashboard|escape:'html'}" method="post">
+        <input type="hidden" name="pwg_token" value="{$GZCA_TOKEN|escape:'html'}"><input type="hidden" name="gzca_action" value="import_sample_works">
+        <span><strong>导入本地样例作品</strong><small>把主题内置的 8 张本地生成作品写入 Piwigo 图库，当前已导入 {$GZCA_SAMPLE_WORKS_STATUS.imported}/{$GZCA_SAMPLE_WORKS_STATUS.total} 张{if $GZCA_SAMPLE_WORKS_STATUS.missing_assets gt 0}，缺少 {$GZCA_SAMPLE_WORKS_STATUS.missing_assets} 个素材文件{/if}。</small></span>
+        <button class="gzca-button gzca-button-primary" type="submit" {if $GZCA_SAMPLE_WORKS_STATUS.remaining eq 0}disabled{/if}>{if $GZCA_SAMPLE_WORKS_STATUS.remaining eq 0}样例已导入{else}导入样例作品{/if}</button>
+      </form>
       <section class="gzca-stat-grid" aria-label="图库统计">
         <article><span>全部作品</span><strong>{$GZCA_STATS.works}</strong><a href="{$GZCA_URLS.works|escape:'html'}">查看作品</a></article>
         <article><span>已上架</span><strong>{$GZCA_STATS.online}</strong><a href="{$GZCA_URLS.works|escape:'html'}&amp;status=online">查看上架内容</a></article>

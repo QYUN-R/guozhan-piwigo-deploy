@@ -270,13 +270,18 @@ function gzca_valid_prefix($value)
 
 function gzca_strip_markers($comment)
 {
-  $comment = preg_replace('/<!--\s*GZCA_(?:CODE|PREFIX):.*?-->/is', '', (string)$comment);
+  $comment = preg_replace('/<!--\s*GZCA_(?:CODE|PREFIX|SAMPLE):.*?-->/is', '', (string)$comment);
   return trim($comment);
 }
 
 function gzca_embed_code($comment, $code)
 {
   return '<!--GZCA_CODE:'.gzca_normalize_code($code).'-->'.gzca_strip_markers($comment);
+}
+
+function gzca_embed_sample_code($comment, $code, $sample_key)
+{
+  return '<!--GZCA_CODE:'.gzca_normalize_code($code).'--><!--GZCA_SAMPLE:'.htmlspecialchars($sample_key, ENT_QUOTES, 'UTF-8').'-->'.gzca_strip_markers($comment);
 }
 
 function gzca_embed_prefix($comment, $prefix)
@@ -313,6 +318,11 @@ function gzca_category_exists($category_id)
 
 function gzca_get_categories($catalog_only=false, $public_only=false)
 {
+  if (!gzca_database_table_exists(GZCA_CATEGORIES_TABLE) || !gzca_database_table_exists(GZCA_WORKS_TABLE))
+  {
+    return array();
+  }
+
   $query = '
 SELECT
     c.id,
@@ -645,6 +655,284 @@ function gzca_category_contract()
     );
 }
 
+function gzca_sample_works_manifest()
+{
+  return array(
+    array(
+      'key' => 'ink-mountain',
+      'file' => 'ink-mountain.jpg',
+      'category_key' => 'ink-landscape',
+      'title' => '国画山水样例',
+      'description' => '本地生成样例作品，用于服务器首次部署后检查分类、编号和详情页效果。',
+      'competition_slug' => 'ink',
+      'featured' => 1,
+      'sort_order' => 10,
+      'download_count' => 86,
+      ),
+    array(
+      'key' => 'ink-flower-bird',
+      'file' => 'ink-flower-bird.jpg',
+      'category_key' => 'ink-flower-bird',
+      'title' => '国画花鸟样例',
+      'description' => '本地生成样例作品，用于检查国画花鸟分类和水墨比赛筛选。',
+      'competition_slug' => 'ink',
+      'featured' => 1,
+      'sort_order' => 20,
+      'download_count' => 73,
+      ),
+    array(
+      'key' => 'oil-landscape',
+      'file' => 'oil-landscape.jpg',
+      'category_key' => 'oil-landscape',
+      'title' => '油画风景样例',
+      'description' => '本地生成样例作品，用于检查油画分类、首页排序和作品详情。',
+      'competition_slug' => 'oil',
+      'featured' => 1,
+      'sort_order' => 30,
+      'download_count' => 92,
+      ),
+    array(
+      'key' => 'oil-architecture',
+      'file' => 'oil-architecture.jpg',
+      'category_key' => 'oil-still',
+      'title' => '油画静物样例',
+      'description' => '本地生成样例作品，用于检查油画板块下的第二个样例作品。',
+      'competition_slug' => 'oil',
+      'featured' => 0,
+      'sort_order' => 40,
+      'download_count' => 61,
+      ),
+    array(
+      'key' => 'print-woodcut',
+      'file' => 'print-woodcut.jpg',
+      'category_key' => 'print-black-woodcut',
+      'title' => '版画木刻样例',
+      'description' => '本地生成样例作品，用于检查版画分类和版画比赛筛选。',
+      'competition_slug' => 'print',
+      'featured' => 1,
+      'sort_order' => 50,
+      'download_count' => 80,
+      ),
+    array(
+      'key' => 'watercolor-landscape',
+      'file' => 'watercolor-landscape.jpg',
+      'category_key' => 'watercolor-landscape',
+      'title' => '水彩风景样例',
+      'description' => '本地生成样例作品，用于检查水彩分类和水彩比赛筛选。',
+      'competition_slug' => 'watercolor',
+      'featured' => 1,
+      'sort_order' => 60,
+      'download_count' => 67,
+      ),
+    array(
+      'key' => 'folk-festival',
+      'file' => 'folk-festival.jpg',
+      'category_key' => 'folk-art',
+      'title' => '农民画节庆样例',
+      'description' => '本地生成样例作品，用于检查农民画直达分类。',
+      'competition_slug' => '',
+      'featured' => 0,
+      'sort_order' => 70,
+      'download_count' => 54,
+      ),
+    array(
+      'key' => 'mixed-material',
+      'file' => 'mixed-material.jpg',
+      'category_key' => 'illustration-painted',
+      'title' => '绘画风格插画样例',
+      'description' => '本地生成样例作品，用于检查插画板块和搜索结果页。',
+      'competition_slug' => '',
+      'featured' => 0,
+      'sort_order' => 80,
+      'download_count' => 48,
+      ),
+    );
+}
+
+function gzca_sample_work_source($sample)
+{
+  $path = PHPWG_ROOT_PATH.'themes/guozhan-gallery/assets/works/'.$sample['file'];
+  return is_file($path) ? $path : '';
+}
+
+function gzca_category_id_by_system_key($system_key)
+{
+  $system_key = strtolower(trim((string)$system_key));
+  if ('' === $system_key || !gzca_database_table_exists(GZCA_CATEGORIES_TABLE))
+  {
+    return 0;
+  }
+  $result = pwg_query(
+    "SELECT category_id FROM ".GZCA_CATEGORIES_TABLE." WHERE system_key = '".pwg_db_real_escape_string($system_key)."' AND catalog_enabled = 1 LIMIT 1;"
+    );
+  if (pwg_db_num_rows($result) === 0)
+  {
+    return 0;
+  }
+  $row = pwg_db_fetch_assoc($result);
+  return (int)$row['category_id'];
+}
+
+function gzca_competition_medium_id_by_slug($slug)
+{
+  $slug = strtolower(trim((string)$slug));
+  if ('' === $slug || !gzca_database_table_exists(GZCA_COMPETITION_MEDIA_TABLE))
+  {
+    return 0;
+  }
+  $result = pwg_query(
+    "SELECT id FROM ".GZCA_COMPETITION_MEDIA_TABLE." WHERE slug = '".pwg_db_real_escape_string($slug)."' AND status = 'active' LIMIT 1;"
+    );
+  if (pwg_db_num_rows($result) === 0)
+  {
+    return 0;
+  }
+  $row = pwg_db_fetch_assoc($result);
+  return (int)$row['id'];
+}
+
+function gzca_sample_work_exists($sample_key)
+{
+  $sample_key = trim((string)$sample_key);
+  if ('' === $sample_key)
+  {
+    return false;
+  }
+  $result = pwg_query(
+    "SELECT id FROM ".IMAGES_TABLE." WHERE comment LIKE '%GZCA_SAMPLE:".pwg_db_real_escape_string($sample_key)."%' LIMIT 1;"
+    );
+  return pwg_db_num_rows($result) > 0;
+}
+
+function gzca_sample_works_status()
+{
+  $total = 0;
+  $imported = 0;
+  $missing_assets = 0;
+  foreach (gzca_sample_works_manifest() as $sample)
+  {
+    $total++;
+    if (gzca_sample_work_exists($sample['key']))
+    {
+      $imported++;
+    }
+    if ('' === gzca_sample_work_source($sample))
+    {
+      $missing_assets++;
+    }
+  }
+  return array(
+    'total' => $total,
+    'imported' => $imported,
+    'missing_assets' => $missing_assets,
+    'remaining' => max(0, $total - $imported),
+    );
+}
+
+function gzca_import_sample_works(&$errors=array())
+{
+  global $conf;
+
+  gzca_seed_categories();
+  include_once(PHPWG_ROOT_PATH.'admin/include/functions_upload.inc.php');
+
+  $created = 0;
+  $skipped = 0;
+  $category_ids = array();
+  foreach (gzca_sample_works_manifest() as $sample)
+  {
+    if (gzca_sample_work_exists($sample['key']))
+    {
+      $skipped++;
+      continue;
+    }
+
+    $source = gzca_sample_work_source($sample);
+    if ('' === $source)
+    {
+      $errors[] = '样例图片缺失：'.$sample['file'];
+      continue;
+    }
+
+    $category_id = gzca_category_id_by_system_key($sample['category_key']);
+    if ($category_id < 1 || !gzca_category_is_upload_target($category_id))
+    {
+      $errors[] = '样例作品“'.$sample['title'].'”找不到可上传分类：'.$sample['category_key'];
+      continue;
+    }
+
+    $prefix = gzca_category_prefix($category_id);
+    if (!gzca_valid_prefix($prefix))
+    {
+      $errors[] = '样例作品“'.$sample['title'].'”所在分类缺少有效编号前缀。';
+      continue;
+    }
+
+    $tmp = tempnam(sys_get_temp_dir(), 'gzca_sample_');
+    if (false === $tmp || !copy($source, $tmp))
+    {
+      if (is_string($tmp) && file_exists($tmp))
+      {
+        @unlink($tmp);
+      }
+      $errors[] = '样例作品“'.$sample['title'].'”复制到临时文件失败。';
+      continue;
+    }
+
+    $image_id = add_uploaded_file($tmp, $sample['file'], array($category_id), 0);
+    if (empty($image_id))
+    {
+      if (file_exists($tmp))
+      {
+        @unlink($tmp);
+      }
+      $errors[] = '样例作品“'.$sample['title'].'”写入图库失败。';
+      continue;
+    }
+
+    $code = gzca_next_code($prefix);
+    $competition_medium_id = gzca_competition_medium_id_by_slug($sample['competition_slug']);
+    single_update(
+      IMAGES_TABLE,
+      array(
+        'name' => $sample['title'],
+        'comment' => gzca_embed_sample_code($sample['description'], $code, $sample['key']),
+        'level' => 0,
+        ),
+      array('id' => (int)$image_id)
+      );
+    gzca_save_work_meta(
+      $image_id,
+      $code,
+      'online',
+      !empty($sample['featured']) ? 1 : 0,
+      isset($sample['sort_order']) ? (int)$sample['sort_order'] : 0,
+      isset($sample['download_count']) ? (int)$sample['download_count'] : 0,
+      $competition_medium_id,
+      isset($sample['sort_order']) ? (int)$sample['sort_order'] : 0
+      );
+    gzca_set_category_cover($category_id, $image_id);
+    update_category($category_id);
+    $category_ids[$category_id] = true;
+    $created++;
+  }
+
+  if ($created > 0)
+  {
+    foreach (array_keys($category_ids) as $category_id)
+    {
+      update_category((int)$category_id);
+    }
+    invalidate_user_cache();
+  }
+
+  return array(
+    'created' => $created,
+    'skipped' => $skipped,
+    'errors' => $errors,
+    );
+}
+
 function gzca_contract_category_keys()
 {
   $keys = array();
@@ -840,6 +1128,11 @@ function gzca_valid_competition_slug($value)
 
 function gzca_get_competition_media($active_only=false)
 {
+  if (!gzca_database_table_exists(GZCA_COMPETITION_MEDIA_TABLE) || !gzca_database_table_exists(GZCA_WORKS_TABLE) || !gzca_database_table_exists(GZCA_CATEGORIES_TABLE))
+  {
+    return array();
+  }
+
   $query = '
 SELECT
     gm.*,
@@ -1170,6 +1463,11 @@ function gzca_save_contact_qr($file, &$error='')
   }
 
   $allowed = array('image/jpeg' => 'jpg', 'image/png' => 'png', 'image/webp' => 'webp');
+  if (!function_exists('finfo_open'))
+  {
+    $error = '服务器缺少 PHP fileinfo 扩展，暂时无法校验二维码图片类型。';
+    return false;
+  }
   $finfo = finfo_open(FILEINFO_MIME_TYPE);
   $mime = finfo_file($finfo, $file['tmp_name']);
   finfo_close($finfo);
@@ -1222,6 +1520,11 @@ function gzca_save_logo($file, &$error='')
   }
 
   $allowed = array('image/jpeg' => 'jpg', 'image/png' => 'png', 'image/webp' => 'webp');
+  if (!function_exists('finfo_open'))
+  {
+    $error = '服务器缺少 PHP fileinfo 扩展，暂时无法校验 Logo 图片类型。';
+    return false;
+  }
   $finfo = finfo_open(FILEINFO_MIME_TYPE);
   $mime = finfo_file($finfo, $file['tmp_name']);
   finfo_close($finfo);

@@ -264,6 +264,11 @@ body#theAdminPage .eiw .errors {
   line-height: 1.2;
 }
 
+.gzca-button:disabled {
+  cursor: not-allowed;
+  opacity: .55;
+}
+
 .gzca-button-primary {
   border-color: var(--gzca-seal);
   background: var(--gzca-seal);
@@ -317,6 +322,10 @@ body#theAdminPage .eiw .errors {
   border-radius: 6px;
   background: rgba(255, 255, 255, .82);
   padding: 13px 15px;
+}
+
+.gzca-setup-bar + .gzca-setup-bar {
+  margin-top: -6px;
 }
 
 .gzca-setup-bar strong,

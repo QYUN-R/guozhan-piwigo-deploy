@@ -396,7 +396,7 @@
       customApiAvailable = true;
       return normalizePage(result, values.page, values.per_page);
     }).catch(function (error) {
-      customApiAvailable = false;
+      customApiAvailable = null;
       if (options.sort === "competition" || options.competition !== undefined) throw error;
       return fetchCoreImagePage(options);
     });
@@ -453,6 +453,18 @@
     }, "张");
     if (!pager) return Promise.resolve();
 
+    function updateCompetitionUrl(slug) {
+      if (!window.history || typeof window.history.replaceState !== "function") return;
+      var next = new URL(window.location.href);
+      next.searchParams.set("gz_page", "competition");
+      if (slug) next.searchParams.set("competition", slug);
+      else next.searchParams.delete("competition");
+      if (query) next.searchParams.set("q", query);
+      else next.searchParams.delete("q");
+      window.history.replaceState(null, "", next.pathname + next.search + next.hash);
+      params = new URLSearchParams(next.search);
+    }
+
     function renderForCompetition(slug) {
       return pager.setLoader(function (pageNumber, pageSize) {
         return fetchImagePage({
@@ -483,7 +495,9 @@
           button.addEventListener("click", function () {
             row.querySelectorAll("[data-competition-filter]").forEach(function (item) { item.setAttribute("aria-pressed", "false"); });
             button.setAttribute("aria-pressed", "true");
-            renderForCompetition(button.getAttribute("data-competition-filter") || "");
+            var nextSlug = button.getAttribute("data-competition-filter") || "";
+            updateCompetitionUrl(nextSlug);
+            renderForCompetition(nextSlug);
           });
         });
       }
@@ -627,7 +641,7 @@
         customApiAvailable = true;
         return image;
       }).catch(function () {
-        customApiAvailable = false;
+        customApiAvailable = null;
         return ws("pwg.images.getInfo", { image_id: imageId });
       });
     }
