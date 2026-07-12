@@ -4,6 +4,7 @@
   const BRAND_NAME = "图物计划国展素材馆";
   const BRAND_EN = "AI Graphics Learning Plan";
   const WECHAT = "aiguozhanhuihua";
+  const isPiwigo = Boolean(window.GUOZHAN_PIWIGO);
 
   const categories = {
     "ink-landscape": cat("国画", "山水画", "国画山水画", "GH-SS", ["山水", "云壑", "溪桥", "松石"]),
@@ -390,7 +391,7 @@
           return;
         }
         const codeInfo = workCodeInfoFromValue(value);
-        if (codeInfo) {
+        if (!isPiwigo && codeInfo) {
           event.preventDefault();
           window.location.href = detailHref(codeInfo.code, codeInfo.key);
         }
@@ -689,7 +690,7 @@
   }
 
   function applyStaticNavigation() {
-    if (window.GUOZHAN_PIWIGO) return;
+    if (isPiwigo) return;
     const nav = document.querySelector("[data-nav]");
     if (!nav) return;
     const active = body.hasAttribute("data-home-page") ? "home"
@@ -708,14 +709,16 @@
     nav.innerHTML = links.map((item) => '<a href="' + item[2] + '"' + (item[0] === active ? ' aria-current="page"' : "") + '>' + item[1] + '</a>').join("");
   }
 
-  renderStaticDirectory();
-  renderStaticSideNav();
-  mountHomeStream();
-  applyCategoryPage();
-  applySearchPage();
-  applyDetailPage();
-  hydrateWorkImages();
-  applyBrand();
-  applyStaticNavigation();
+  if (!isPiwigo) {
+    renderStaticDirectory();
+    renderStaticSideNav();
+    mountHomeStream();
+    applyCategoryPage();
+    applySearchPage();
+    applyDetailPage();
+    hydrateWorkImages();
+    applyBrand();
+    applyStaticNavigation();
+  }
   wireCommon();
 })();

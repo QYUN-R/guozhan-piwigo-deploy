@@ -144,6 +144,11 @@ function gzca_ws_query_images($params, $image_id=0, $include_detail=false)
       ? 'gm.id = '.(int)$competition
       : "gm.slug = '".pwg_db_real_escape_string($competition)."'";
   }
+  elseif ('competition' === $sort)
+  {
+    $where[] = "gm.status = 'active'";
+    $where[] = 'gw.competition_medium_id IS NOT NULL';
+  }
 
   $order_by = 'CASE WHEN COALESCE(gw.sort_order, 0) > 0 THEN 0 ELSE 1 END, COALESCE(gw.sort_order, 0) ASC, i.date_available DESC, i.id DESC';
   if ('featured' === $sort)

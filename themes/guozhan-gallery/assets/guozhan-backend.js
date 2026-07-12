@@ -60,6 +60,16 @@
     return match ? Number(match[1]) : null;
   }
 
+  function codeFromUrl(url) {
+    try {
+      return new URL(String(url || window.location.href), window.location.href).searchParams.get("code") || "";
+    } catch (error) {
+      var text = String(url || window.location.href);
+      var match = text.match(/[?&]code=([^&#]+)/);
+      return match ? decodeURIComponent(match[1].replace(/\+/g, " ")) : "";
+    }
+  }
+
   function isTopCategory(cat) {
     return cat && (cat.id_uppercat === null || cat.id_uppercat === undefined || cat.id_uppercat === "");
   }
@@ -97,6 +107,7 @@
   }
 
   function imageCode(image) {
+    image = image || {};
     if (image && image.gzca_code) return String(image.gzca_code).toUpperCase();
     var source = [image.name, image.comment, image.file, image.id].join(" ");
     var match = source.match(/[A-Z]{2,}(?:-[A-Z0-9]+)+-\d{3,}/i);
@@ -117,7 +128,7 @@
   function renderWorkCard(image, fallbackMeta) {
     var code = imageCode(image);
     var title = imageTitle(image);
-    return '<a class="work-card" href="' + escapeHtml(image.page_url || appUrl("detail", { code: code })) + '" data-code="' + escapeHtml(code) + '">' +
+    return '<a class="work-card" href="' + escapeHtml(detailHref(image)) + '" data-code="' + escapeHtml(code) + '">' +
       '<figure class="work-thumb"><span class="code-badge">' + escapeHtml(code) + '</span><img loading="lazy" decoding="async" src="' + escapeHtml(thumbnailImageUrl(image)) + '" alt="' + escapeHtml(title) + '"></figure>' +
       '<div class="work-caption"><h3>' + escapeHtml(title) + '</h3><p class="card-meta">' + escapeHtml(imageMeta(image, fallbackMeta)) + '</p><p class="work-code-line">作品编码：' + escapeHtml(code) + '</p></div>' +
     '</a>';
@@ -126,12 +137,22 @@
   function renderResultCard(image, fallbackMeta) {
     var code = imageCode(image);
     var title = imageTitle(image);
-    var href = image.page_url || appUrl("detail", { code: code });
+    var href = detailHref(image);
     return '<article class="result-card" data-code="' + escapeHtml(code) + '">' +
       '<a class="work-thumb" href="' + escapeHtml(href) + '"><span class="code-badge">' + escapeHtml(code) + '</span><img loading="lazy" decoding="async" src="' + escapeHtml(thumbnailImageUrl(image)) + '" alt="' + escapeHtml(title) + '"></a>' +
       '<div><h3>' + escapeHtml(title) + '</h3><p class="card-meta">' + escapeHtml(imageMeta(image, fallbackMeta)) + '</p><p class="work-code-line">作品编码：' + escapeHtml(code) + '</p></div>' +
       '<a class="btn btn-secondary" href="' + escapeHtml(href) + '">查看详情</a>' +
     '</article>';
+  }
+
+  function detailHref(image) {
+    if (image && image.id) return appUrl("detail", { image_id: image.id });
+    if (image && image.page_url) return image.page_url;
+    return appUrl("detail", { code: imageCode(image) });
+  }
+
+  function categoryHref(cat) {
+    return cat && cat.id ? appUrl("category", { cat_id: cat.id }) : appUrl("categories");
   }
 
   function renderPager(container, pagination, items, pageSize, renderItem, unit) {
@@ -253,12 +274,12 @@
     var childLinks = children.length ? children : [cat];
     var visibleLimit = 3;
     var hiddenCount = Math.max(0, childLinks.length - visibleLimit);
-    var primaryHref = cat.url || appUrl("category", { cat_id: cat.id });
+    var primaryHref = categoryHref(cat);
     var cover = cat.tn_url ? '<img class="directory-cover" src="' + escapeHtml(cat.tn_url) + '" alt="" loading="lazy">' : "";
     return '<article class="directory-card" data-index="' + String(index + 1).padStart(2, "0") + '">' +
       '<div class="directory-card-copy">' + cover + '<p class="small">分类入口</p><h3><a class="directory-title-link" href="' + escapeHtml(primaryHref) + '">' + escapeHtml(cat.name) + '</a></h3><p class="muted">' + escapeHtml(stripHtml(cat.comment) || ("共 " + (cat.total_nb_images || cat.nb_images || 0) + " 张作品")) + '</p></div>' +
       '<div class="sub-links">' + childLinks.map(function (item, itemIndex) {
-        return '<a class="sub-link' + (itemIndex >= visibleLimit ? ' is-extra' : '') + '" href="' + escapeHtml(item.url || appUrl("category", { cat_id: item.id })) + '">' + escapeHtml(item.name) + ' <span>' + escapeHtml((item.total_nb_images || item.nb_images || 0) + "张") + '</span></a>';
+        return '<a class="sub-link' + (itemIndex >= visibleLimit ? ' is-extra' : '') + '" href="' + escapeHtml(categoryHref(item)) + '">' + escapeHtml(item.name) + ' <span>' + escapeHtml((item.total_nb_images || item.nb_images || 0) + "张") + '</span></a>';
       }).join("") + (hiddenCount ? '<button class="sub-more-button" type="button" data-sub-toggle aria-expanded="false">展开更多 ' + hiddenCount + '</button>' : "") + '</div>' +
     '</article>';
   }
@@ -278,7 +299,7 @@
   }
 
   function compactCategoryCard(cat, index) {
-    var primaryHref = cat.url || appUrl("category", { cat_id: cat.id });
+    var primaryHref = categoryHref(cat);
     return '<a class="quick-category-card" href="' + escapeHtml(primaryHref) + '">' +
       (cat.tn_url ? '<img class="quick-category-cover" src="' + escapeHtml(cat.tn_url) + '" alt="" loading="lazy">' : "") +
       '<span class="quick-category-index">' + String(index + 1).padStart(2, "0") + '</span>' +
@@ -374,8 +395,9 @@
     return ws("gzca.images.getList", values).then(function (result) {
       customApiAvailable = true;
       return normalizePage(result, values.page, values.per_page);
-    }).catch(function () {
+    }).catch(function (error) {
       customApiAvailable = false;
+      if (options.sort === "competition" || options.competition !== undefined) throw error;
       return fetchCoreImagePage(options);
     });
   }
@@ -486,7 +508,7 @@
     var currentId = categoryIdFromUrl();
     nav.innerHTML = items.map(function (cat) {
       var active = sameId(cat.id, currentId) ? ' class="is-active"' : "";
-      return '<a' + active + ' href="' + escapeHtml(cat.url || appUrl("category", { cat_id: cat.id })) + '">' + escapeHtml(cat.name) + ' <span>' + escapeHtml((cat.total_nb_images || cat.nb_images || 0) + "张") + '</span></a>';
+      return '<a' + active + ' href="' + escapeHtml(categoryHref(cat)) + '">' + escapeHtml(cat.name) + ' <span>' + escapeHtml((cat.total_nb_images || cat.nb_images || 0) + "张") + '</span></a>';
     }).join("");
   }
 
@@ -612,6 +634,19 @@
     return ws("pwg.images.getInfo", { image_id: imageId });
   }
 
+  function fetchImageInfoByCode(code) {
+    var normalizedCode = String(code || "").trim().toUpperCase();
+    if (!normalizedCode) return Promise.reject(new Error("Missing artwork code"));
+    return fetchImagePage({ query: normalizedCode, page: 0, perPage: 5, sort: "code" }).then(function (result) {
+      var images = result && result.images || [];
+      var exact = images.find(function (item) {
+        return imageCode(item) === normalizedCode;
+      }) || images[0];
+      if (!exact) throw new Error("Artwork not found");
+      return exact.id ? fetchImageInfo(exact.id).catch(function () { return exact; }) : exact;
+    });
+  }
+
   function detailCategory(image) {
     if (image && image.category) return image.category;
     var categories = image && image.categories;
@@ -652,7 +687,7 @@
       mainImage.alt = title;
     }
 
-    var categoryHref = category.url || (category.id ? appUrl("category", { cat_id: category.id }) : appUrl("categories"));
+    var categoryHref = category.id ? appUrl("category", { cat_id: category.id }) : appUrl("categories");
     app.querySelectorAll("[data-back-list], [data-related-more], [data-detail-category-link]").forEach(function (link) {
       link.href = categoryHref;
     });
@@ -665,14 +700,19 @@
       var grid = app.querySelector("[data-related-grid]");
       if (grid) grid.innerHTML = related.length ? related.map(function (item) { return renderWorkCard(item, categoryText); }).join("") : '<div class="empty-state">该分类更多作品正在整理中</div>';
       var nextLink = app.querySelector("[data-next-detail]");
-      if (nextLink && related.length) nextLink.href = related[0].page_url || appUrl("detail", { code: imageCode(related[0]) });
+      if (nextLink && related.length) nextLink.href = detailHref(related[0]);
       return true;
     });
   }
 
   function applyDetail() {
     var imageId = pictureIdFromUrl();
-    if (!imageId) return applyDetailFromNative();
+    if (!imageId) {
+      var code = codeFromUrl();
+      return code ? fetchImageInfoByCode(code).then(applyDetailImage).catch(function () {
+        return applyDetailFromNative();
+      }) : applyDetailFromNative();
+    }
     return fetchImageInfo(imageId).then(applyDetailImage).catch(function () {
       return applyDetailFromNative();
     });
