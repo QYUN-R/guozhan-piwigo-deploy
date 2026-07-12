@@ -1,4 +1,4 @@
-# GuozhanClientAdmin 0.5.1
+# GuozhanClientAdmin 0.5.2
 
 Piwigo 16.4 compatible customer administration plugin for 图物计划国展素材馆。
 
@@ -29,8 +29,8 @@ Frontend replacement should use returned `key` / `system_key`, `id`, `url` and `
 
 ## Access model
 
-- Webmaster: full Piwigo administration.
-- Administrator: customer dashboard when restriction is enabled.
+- Webmaster: `admin.php` and native administration pages open the Guozhan customer dashboard after the plugin is enabled.
+- Administrator: customer dashboard only; native Piwigo administration pages are hidden.
 - Guest/member: no administration actions.
 
 All writes require administrator access and a valid Piwigo CSRF token. Schema updates are additive and do not delete core Piwigo images, albums or users.

@@ -392,10 +392,7 @@ if ('save_contact' === $action)
   $config['phone'] = gzca_clean_text(isset($_POST['phone']) ? $_POST['phone'] : '', 80);
   $config['contact_note'] = gzca_clean_text(isset($_POST['contact_note']) ? $_POST['contact_note'] : '', 1000);
   $config['frontend_sync'] = isset($_POST['frontend_sync']);
-  if (is_webmaster())
-  {
-    $config['restrict_administrators'] = isset($_POST['restrict_administrators']);
-  }
+  $config['restrict_administrators'] = true;
 
   $qr_error = '';
   $qr_path = gzca_save_contact_qr(isset($_FILES['contact_qr']) ? $_FILES['contact_qr'] : array(), $qr_error);

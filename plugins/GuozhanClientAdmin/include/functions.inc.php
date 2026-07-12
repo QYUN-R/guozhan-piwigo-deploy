@@ -163,22 +163,28 @@ function gzca_is_customer_admin()
   return !empty($config['restrict_administrators']) && is_admin() && !is_webmaster();
 }
 
+function gzca_is_plugin_admin_request()
+{
+  $page = isset($_GET['page']) ? $_GET['page'] : '';
+  $section = isset($_GET['section']) ? $_GET['section'] : '';
+
+  return 'plugin-'.GZCA_ID === $page
+    || ('plugin' === $page && GZCA_ID.'/admin.php' === $section);
+}
+
 function gzca_restrict_customer_admin()
 {
-  if (!gzca_is_customer_admin())
+  if (!is_admin())
   {
     return;
   }
 
-  $page = isset($_GET['page']) ? $_GET['page'] : '';
-  $section = isset($_GET['section']) ? $_GET['section'] : '';
-  $allowed = 'plugin-'.GZCA_ID === $page
-    || ('plugin' === $page && GZCA_ID.'/admin.php' === $section);
-
-  if (!$allowed)
+  if (gzca_is_plugin_admin_request())
   {
-    redirect(gzca_admin_url('dashboard'));
+    return;
   }
+
+  redirect(gzca_admin_url('dashboard'));
 }
 
 function gzca_render_frontend_bridge()

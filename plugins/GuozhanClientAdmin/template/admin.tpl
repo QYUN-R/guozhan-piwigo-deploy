@@ -40,7 +40,7 @@
     </header>
 
     {if $GZCA_IS_WEBMASTER}
-      <div class="gzca-role-note"><strong>站长模式</strong><span>你仍可使用完整 Piwigo 后台；普通管理员登录后会自动进入此客户后台。</span></div>
+      <div class="gzca-role-note"><strong>定制后台</strong><span>当前后台入口已接管为国展定制页面，原生 Piwigo 后台不再对客户后台展示。</span></div>
     {/if}
 
     {if $GZCA_TAB eq 'dashboard'}
@@ -295,7 +295,7 @@
             <label class="gzca-field"><span>联系电话</span><input type="text" name="phone" value="{$GZCA_CONFIG.phone|escape:'html'}" placeholder="可不填写"></label>
             <label class="gzca-field"><span>联系说明</span><textarea name="contact_note" rows="5">{$GZCA_CONFIG.contact_note|escape:'html'}</textarea></label>
             <label class="gzca-check"><input type="checkbox" name="frontend_sync" value="1" {if $GZCA_CONFIG.frontend_sync}checked{/if}><span><strong>同步到网站客服弹窗</strong><small>会替换前台显示的微信号、说明和二维码。</small></span></label>
-            {if $GZCA_IS_WEBMASTER}<label class="gzca-check"><input type="checkbox" name="restrict_administrators" value="1" {if $GZCA_CONFIG.restrict_administrators}checked{/if}><span><strong>普通管理员只使用客户后台</strong><small>站长账号始终可以进入完整 Piwigo 后台。</small></span></label>{/if}
+            {if $GZCA_IS_WEBMASTER}<div class="gzca-info-line"><strong>后台入口</strong><small>所有后台访问默认展示国展定制后台，原生 Piwigo 后台已隐藏。</small></div>{/if}
           </div>
         </section>
         <aside class="gzca-panel gzca-qr-panel">

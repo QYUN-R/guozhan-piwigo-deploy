@@ -674,6 +674,30 @@ body#theAdminPage .eiw .errors {
   font-size: 13px;
 }
 
+.gzca-info-line {
+  display: grid;
+  gap: 3px;
+  border-left: 3px solid var(--gzca-jade);
+  background: #f7f5ee;
+  padding: 10px 12px;
+}
+
+.gzca-info-line strong,
+.gzca-info-line small {
+  display: block;
+}
+
+.gzca-info-line strong {
+  color: var(--gzca-ink-2);
+  font-size: 13px;
+}
+
+.gzca-info-line small {
+  color: var(--gzca-muted);
+  font-size: 11px;
+  line-height: 1.5;
+}
+
 .gzca-filterbar {
   display: grid;
   grid-template-columns: minmax(220px, 1fr) 180px 140px 160px auto;
