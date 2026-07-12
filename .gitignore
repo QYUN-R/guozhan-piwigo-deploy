@@ -1,0 +1,22 @@
+# Server-local Piwigo configuration
+/local/config/database.inc.php
+/local/config/config.inc.php
+/local/config/*.local.php
+
+# Runtime cache and generated data
+/_data/*
+!/_data/dummy.txt
+!/_data/.gitkeep
+
+# Uploaded or synchronized media should live on the server, not in git
+/upload/*
+!/upload/.gitkeep
+/galleries/*
+!/galleries/index.php
+!/galleries/.gitkeep
+
+# OS/editor noise
+.DS_Store
+Thumbs.db
+*.log
+

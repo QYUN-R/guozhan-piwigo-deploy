@@ -1,0 +1,34 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 1600 900" role="img" aria-label="水墨山峦背景">
+  <defs>
+    <linearGradient id="paper" x1="0" y1="0" x2="1" y2="1">
+      <stop offset="0" stop-color="#f5efe0"/>
+      <stop offset=".52" stop-color="#e6dcc8"/>
+      <stop offset="1" stop-color="#b9ad96"/>
+    </linearGradient>
+    <radialGradient id="sun" cx=".76" cy=".28" r=".22">
+      <stop offset="0" stop-color="#f4c66a" stop-opacity=".72"/>
+      <stop offset=".58" stop-color="#f4c66a" stop-opacity=".16"/>
+      <stop offset="1" stop-color="#f4c66a" stop-opacity="0"/>
+    </radialGradient>
+    <filter id="soft" x="-10%" y="-20%" width="120%" height="150%">
+      <feGaussianBlur stdDeviation="5"/>
+    </filter>
+  </defs>
+  <rect width="1600" height="900" fill="url(#paper)"/>
+  <rect width="1600" height="900" fill="url(#sun)"/>
+  <g opacity=".13" stroke="#463c32" stroke-width="1">
+    <path d="M0 142h1600M0 286h1600M0 430h1600M0 574h1600M0 718h1600"/>
+    <path d="M160 0v900M320 0v900M480 0v900M640 0v900M800 0v900M960 0v900M1120 0v900M1280 0v900M1440 0v900"/>
+  </g>
+  <path d="M0 610C120 540 190 520 310 574c95 43 168 12 250-54 118-95 236-88 366 20 102 84 214 92 342 18 129-75 220-78 332-6v348H0z" fill="#2f4034" opacity=".7"/>
+  <path d="M0 688c115-54 225-56 334-4 146 69 257 48 390-78 111-106 220-110 334-13 117 101 234 110 354 27 70-49 132-66 188-52v332H0z" fill="#1d2926" opacity=".76"/>
+  <path d="M0 766c154-44 312-40 474 10 129 41 246 38 353-8 156-67 299-76 428-27 120 46 235 54 345 24v135H0z" fill="#0d1718" opacity=".84"/>
+  <g filter="url(#soft)" opacity=".42" fill="#fff8ea">
+    <path d="M0 458c210-32 419-34 626-5s405 28 594 0c151-22 278-19 380 10v78c-156-34-318-40-486-15-218 33-395 24-560 2C350 501 167 506 0 543z"/>
+    <path d="M168 325c151-24 290-27 417-9 185 27 352 25 503-4 104-20 216-22 336-5v45c-150-22-283-18-399 12-146 37-314 42-504 15-122-17-240-18-353-4z"/>
+  </g>
+  <g fill="none" stroke="#9c4b36" stroke-width="5" opacity=".74">
+    <circle cx="1320" cy="185" r="68"/>
+    <path d="M1272 185h96M1320 137v96"/>
+  </g>
+</svg>
