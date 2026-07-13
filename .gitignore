@@ -7,6 +7,7 @@
 /_data/*
 !/_data/dummy.txt
 !/_data/.gitkeep
+/artifacts/
 
 # Uploaded or synchronized media should live on the server, not in git
 /upload/*

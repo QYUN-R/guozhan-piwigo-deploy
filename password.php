@@ -101,11 +101,18 @@ function process_verification_code()
   switch_lang_to($userdata['language']);
   $user_code = generate_user_code();
   $template_mail = pwg_generate_code_verification_mail($user_code['code']);
+  $mail_send = true;
   if (!$skip_mail)
   {
     $mail_send = pwg_mail($userdata['email'], $template_mail);
   }
   switch_lang_back();
+
+  if (!$mail_send)
+  {
+    $page['errors']['password_form_error'] = l10n('Email sending failed');
+    return false;
+  }
 
   $_SESSION['reset_password_code'] = [
       'secret' => $user_code['secret'],
@@ -291,12 +298,50 @@ function reset_password()
     $page['errors']['password_form_error'] = l10n('Invalid key or code');
     return false;
   }
+
+  if (function_exists('gzca_validate_new_admin_password') && function_exists('gzca_admin_account_is_allowed'))
+  {
+    $reset_account = getuserdata($user_id, false);
+    $reset_account['id'] = (int)$user_id;
+    $password_policy_error = '';
+    if (gzca_admin_account_is_allowed($reset_account)
+        && !gzca_validate_new_admin_password(
+          $_POST['use_new_pwd'],
+          $reset_account['username'],
+          $reset_account['email'],
+          $password_policy_error
+          ))
+    {
+      $page['errors']['password_form_error'] = $password_policy_error;
+      return false;
+    }
+  }
     
   single_update(
     USERS_TABLE,
     array($conf['user_fields']['password'] => $conf['password_hash']($_POST['use_new_pwd'])),
     array($conf['user_fields']['id'] => $user_id)
     );
+
+  if (function_exists('gzca_revoke_user_credentials'))
+  {
+    gzca_revoke_user_credentials($user_id);
+  }
+  else
+  {
+    deactivate_password_reset_key($user_id);
+    deactivate_user_auth_keys($user_id);
+    pwg_query('
+UPDATE '.USER_AUTH_KEYS_TABLE.'
+  SET expired_on = NOW(),
+      revoked_on = CASE
+        WHEN key_type = \'api_key\' AND revoked_on IS NULL THEN NOW()
+        ELSE revoked_on
+      END
+  WHERE user_id = '.(int)$user_id.'
+;');
+    delete_user_sessions($user_id);
+  }
 
   if (isset($_SESSION['valid_reset_password_code']) and !empty($_SESSION['valid_reset_password_code']['email']))
   {
@@ -334,8 +379,6 @@ function reset_password_key()
     return false;
   }
 
-  deactivate_password_reset_key($user_id);
-  deactivate_user_auth_keys($user_id);
   return $user_id;
 }
 

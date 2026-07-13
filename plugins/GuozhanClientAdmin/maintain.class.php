@@ -78,6 +78,7 @@ class GuozhanClientAdmin_maintain extends PluginMaintain
     $works_table = $prefixeTable.'gzca_works';
     $categories_table = $prefixeTable.'gzca_categories';
     $competition_media_table = $prefixeTable.'gzca_competition_media';
+    $admin_security_table = $prefixeTable.'gzca_admin_security';
 
     pwg_query('
 CREATE TABLE IF NOT EXISTS `'.$works_table.'` (
@@ -141,6 +142,20 @@ CREATE TABLE IF NOT EXISTS `'.$competition_media_table.'` (
 
     $this->seed_competition_media($competition_media_table);
 
+    pwg_query('
+CREATE TABLE IF NOT EXISTS `'.$admin_security_table.'` (
+  `user_id` MEDIUMINT UNSIGNED NOT NULL,
+  `verified_email_hash` CHAR(64) NOT NULL DEFAULT \'\',
+  `email_verified_at` DATETIME DEFAULT NULL,
+  `password_changed_at` DATETIME DEFAULT NULL,
+  `sessions_revoked_before` DATETIME DEFAULT NULL,
+  `updated_at` DATETIME DEFAULT NULL,
+  PRIMARY KEY (`user_id`)
+) ENGINE=MyISAM DEFAULT CHARSET=utf8mb4
+;');
+
+    $this->ensure_column($admin_security_table, 'sessions_revoked_before', 'DATETIME DEFAULT NULL AFTER `password_changed_at`');
+
     if (empty($conf['gzca_config']))
     {
       conf_update_param('gzca_config', $this->default_config(), true, 'serialize');
@@ -177,6 +192,7 @@ CREATE TABLE IF NOT EXISTS `'.$competition_media_table.'` (
     pwg_query('DROP TABLE IF EXISTS `'.$prefixeTable.'gzca_works`;');
     pwg_query('DROP TABLE IF EXISTS `'.$prefixeTable.'gzca_categories`;');
     pwg_query('DROP TABLE IF EXISTS `'.$prefixeTable.'gzca_competition_media`;');
+    pwg_query('DROP TABLE IF EXISTS `'.$prefixeTable.'gzca_admin_security`;');
     conf_delete_param('gzca_config');
   }
 }

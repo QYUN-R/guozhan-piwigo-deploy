@@ -7,7 +7,7 @@ include_once(PHPWG_ROOT_PATH.'admin/include/functions.php');
 
 global $conf, $page, $template, $user;
 
-$allowed_tabs = array('dashboard', 'home', 'upload', 'works', 'categories', 'contact');
+$allowed_tabs = array('dashboard', 'home', 'upload', 'works', 'categories', 'contact', 'security');
 $tab = isset($_GET['tab']) ? $_GET['tab'] : 'dashboard';
 if (!in_array($tab, $allowed_tabs, true))
 {
@@ -18,6 +18,151 @@ $action = isset($_POST['gzca_action']) ? $_POST['gzca_action'] : '';
 if (!empty($action))
 {
   check_pwg_token();
+}
+
+$email_security = gzca_admin_email_security_status((int)$user['id']);
+$mail_status = gzca_security_mail_status();
+$security_form_email = isset($_POST['new_email']) ? gzca_normalize_email($_POST['new_email']) : '';
+if (!empty($email_security['requires_binding']) && !empty($mail_status['ready']) && 'security' !== $tab)
+{
+  redirect(gzca_admin_url('security', array('setup' => 1)));
+}
+
+if ('revoke_other_sessions' === $action)
+{
+  $current_password = isset($_POST['current_password']) ? (string)$_POST['current_password'] : '';
+  $confirmed = isset($_POST['confirm_other_sessions']) && '1' === (string)$_POST['confirm_other_sessions'];
+  $session_error = '';
+  $revoked_count = 0;
+  if (!gzca_verify_current_password((int)$user['id'], $current_password))
+  {
+    $page['errors'][] = '当前密码不正确，未退出任何设备。';
+  }
+  elseif (!$confirmed)
+  {
+    $page['errors'][] = '请先确认退出其他设备，再执行此操作。';
+  }
+  elseif (gzca_revoke_other_admin_sessions((int)$user['id'], $session_error, $revoked_count))
+  {
+    $page['infos'][] = $revoked_count > 0
+      ? '已退出其他设备的 '.$revoked_count.' 个登录会话，当前设备保持登录。'
+      : '当前没有检测到其他登录会话，当前设备保持登录。';
+  }
+  else
+  {
+    $page['errors'][] = $session_error;
+  }
+}
+
+if ('send_bind_email_code' === $action)
+{
+  $current_password = isset($_POST['current_password']) ? (string)$_POST['current_password'] : '';
+  $email_error = '';
+  if (!gzca_verify_current_password((int)$user['id'], $current_password))
+  {
+    $page['errors'][] = '当前密码不正确，未发送验证码。';
+  }
+  elseif (!gzca_validate_admin_email((int)$user['id'], $security_form_email, $email_error))
+  {
+    $page['errors'][] = $email_error;
+  }
+  elseif (gzca_send_admin_security_code('bind_email', $security_form_email, (int)$user['id'], $email_error))
+  {
+    $page['infos'][] = '验证码已发送到 '.gzca_mask_email($security_form_email).'，10 分钟内有效。';
+  }
+  else
+  {
+    $page['errors'][] = $email_error;
+  }
+}
+
+if ('verify_bind_email' === $action)
+{
+  $current_password = isset($_POST['current_password']) ? (string)$_POST['current_password'] : '';
+  $verification_code = isset($_POST['verification_code']) ? (string)$_POST['verification_code'] : '';
+  $email_error = '';
+  if (!gzca_verify_current_password((int)$user['id'], $current_password))
+  {
+    $page['errors'][] = '当前密码不正确，邮箱没有变更。';
+  }
+  elseif (!gzca_validate_admin_email((int)$user['id'], $security_form_email, $email_error))
+  {
+    $page['errors'][] = $email_error;
+  }
+  elseif (!gzca_verify_admin_security_code('bind_email', $security_form_email, $verification_code, (int)$user['id'], $email_error))
+  {
+    $page['errors'][] = $email_error;
+  }
+  elseif (gzca_bind_verified_admin_email((int)$user['id'], $security_form_email, $email_error))
+  {
+    $page['infos'][] = '恢复邮箱已验证并绑定为 '.gzca_mask_email($security_form_email).'。以后找回密码会使用这个邮箱。';
+    $email_security = gzca_admin_email_security_status((int)$user['id']);
+  }
+  else
+  {
+    $page['errors'][] = $email_error;
+  }
+}
+
+if ('send_password_code' === $action)
+{
+  $current_password = isset($_POST['current_password']) ? (string)$_POST['current_password'] : '';
+  $password_error = '';
+  if (empty($email_security['verified']))
+  {
+    $page['errors'][] = '请先验证并绑定恢复邮箱，再修改管理员密码。';
+  }
+  elseif (!gzca_verify_current_password((int)$user['id'], $current_password))
+  {
+    $page['errors'][] = '当前密码不正确，未发送验证码。';
+  }
+  elseif (gzca_send_admin_security_code('change_password', $email_security['email'], (int)$user['id'], $password_error))
+  {
+    $page['infos'][] = '改密验证码已发送到 '.$email_security['masked_email'].'，10 分钟内有效。';
+  }
+  else
+  {
+    $page['errors'][] = $password_error;
+  }
+}
+
+if ('change_admin_password' === $action)
+{
+  $current_password = isset($_POST['current_password']) ? (string)$_POST['current_password'] : '';
+  $verification_code = isset($_POST['verification_code']) ? (string)$_POST['verification_code'] : '';
+  $new_password = isset($_POST['new_password']) ? (string)$_POST['new_password'] : '';
+  $new_password_confirm = isset($_POST['new_password_confirm']) ? (string)$_POST['new_password_confirm'] : '';
+  $password_error = '';
+  if (empty($email_security['verified']))
+  {
+    $page['errors'][] = '请先验证并绑定恢复邮箱，再修改管理员密码。';
+  }
+  elseif (!gzca_verify_current_password((int)$user['id'], $current_password))
+  {
+    $page['errors'][] = '当前密码不正确，密码没有变更。';
+  }
+  elseif ($new_password !== $new_password_confirm)
+  {
+    $page['errors'][] = '两次输入的新密码不一致。';
+  }
+  elseif ($new_password === $current_password)
+  {
+    $page['errors'][] = '新密码不能与当前密码相同。';
+  }
+  elseif (!gzca_validate_new_admin_password($new_password, $user['username'], $email_security['email'], $password_error))
+  {
+    $page['errors'][] = $password_error;
+  }
+  elseif (!gzca_verify_admin_security_code('change_password', $email_security['email'], $verification_code, (int)$user['id'], $password_error))
+  {
+    $page['errors'][] = $password_error;
+  }
+  else
+  {
+    gzca_change_admin_password((int)$user['id'], $new_password);
+    logout_user();
+    redirect(gzca_admin_login_url('password_changed'));
+  }
 }
 
 if ('download_work' === $action)
@@ -599,6 +744,11 @@ $category_option_groups = gzca_category_option_groups($categories);
 $upload_target_count = count($category_options);
 $database_health = gzca_database_health();
 $sample_works_status = gzca_sample_works_status();
+$email_security = gzca_admin_email_security_status((int)$user['id']);
+$email_security_view = $email_security;
+unset($email_security_view['email']);
+$email_security_view['bind_challenge'] = gzca_security_challenge_status('bind_email');
+$email_security_view['password_challenge'] = gzca_security_challenge_status('change_password');
 
 $stats = array();
 list($stats['works']) = pwg_db_fetch_row(pwg_query('SELECT COUNT(*) FROM '.IMAGES_TABLE.';'));
@@ -808,6 +958,9 @@ $template->assign(array(
   'GZCA_IS_WEBMASTER' => is_webmaster(),
   'GZCA_IS_CUSTOMER_ADMIN' => gzca_is_customer_admin(),
   'GZCA_ADMIN_IDENTITY' => gzca_admin_identity(),
+  'GZCA_EMAIL_SECURITY' => $email_security_view,
+  'GZCA_SECURITY_MAIL' => $mail_status,
+  'GZCA_SECURITY_FORM' => array('new_email' => $security_form_email),
   'GZCA_STATS' => $stats,
   'GZCA_DATABASE_HEALTH' => $database_health,
   'GZCA_SAMPLE_WORKS_STATUS' => $sample_works_status,
@@ -835,6 +988,7 @@ $template->assign(array(
     'works' => gzca_admin_url('works'),
     'categories' => gzca_admin_url('categories'),
     'contact' => gzca_admin_url('contact'),
+    'security' => gzca_admin_url('security'),
     'gallery' => get_gallery_home_url(),
     'logout' => get_root_url().'index.php?act=logout',
     ),

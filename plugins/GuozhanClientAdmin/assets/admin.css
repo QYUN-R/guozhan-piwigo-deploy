@@ -24,6 +24,7 @@ body#theAdminPage {
 body#theAdminPage #pwgHead,
 body#theAdminPage #menubar,
 body#theAdminPage #content > h1,
+body#theAdminPage #footer,
 body#theAdminPage #copyright {
   display: none !important;
 }
@@ -262,6 +263,15 @@ body#theAdminPage .eiw .errors {
   border-radius: 6px;
   background: var(--gzca-surface);
   padding: 7px 10px;
+  color: inherit;
+  text-decoration: none;
+  transition: border-color .15s ease, background .15s ease;
+}
+
+.gzca-admin-session:hover,
+.gzca-admin-session[aria-current="page"] {
+  border-color: var(--gzca-jade);
+  background: #f7faf7;
 }
 
 .gzca-admin-session-mark {
@@ -2580,5 +2590,424 @@ body#theAdminPage .eiw .errors {
   .gzca-confirm-actions .gzca-button {
     width: 100%;
     min-width: 0;
+  }
+}
+
+.gzca-page-header-account {
+  margin-bottom: 18px;
+}
+
+.gzca-account-page {
+  width: 100%;
+  max-width: 1080px;
+  margin: 0 auto;
+}
+
+.gzca-account-hero {
+  display: grid;
+  grid-template-columns: 60px minmax(0, 1fr) auto;
+  align-items: center;
+  gap: 18px;
+  margin-bottom: 18px;
+  border: 1px solid #263633;
+  border-radius: 7px;
+  background: var(--gzca-ink);
+  padding: 22px 24px;
+  color: #fff;
+}
+
+.gzca-account-avatar {
+  width: 56px;
+  height: 56px;
+  display: grid;
+  place-items: center;
+  border: 1px solid rgba(255, 255, 255, .22);
+  border-radius: 50%;
+  background: rgba(255, 255, 255, .08);
+  font-size: 18px;
+  font-weight: 800;
+}
+
+.gzca-account-copy {
+  min-width: 0;
+}
+
+.gzca-account-copy > span {
+  color: rgba(255, 255, 255, .6);
+  font-size: 11px;
+  font-weight: 800;
+}
+
+.gzca-account-copy h3 {
+  margin: 3px 0 8px;
+  color: #fff;
+  font-size: 24px;
+  line-height: 1.2;
+}
+
+.gzca-account-meta {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 7px 16px;
+}
+
+.gzca-account-meta span {
+  color: rgba(255, 255, 255, .7);
+  font-size: 12px;
+}
+
+.gzca-account-actions {
+  display: flex;
+  align-items: center;
+  flex-wrap: wrap;
+  justify-content: flex-end;
+  gap: 9px;
+}
+
+.gzca-security-layout {
+  max-width: 1080px;
+  display: grid;
+  grid-template-columns: minmax(0, 1fr);
+  gap: 18px;
+  align-items: start;
+}
+
+.gzca-security-panel {
+  min-width: 0;
+}
+
+.gzca-security-badge {
+  min-height: 28px;
+  display: inline-flex;
+  align-items: center;
+  border: 1px solid var(--gzca-line);
+  border-radius: 4px;
+  padding: 4px 9px;
+  background: #f6f5f1;
+  color: var(--gzca-muted);
+  font-size: 12px;
+  font-weight: 800;
+}
+
+.gzca-security-badge.is-verified {
+  border-color: #b9cbbf;
+  background: #edf5ef;
+  color: #426451;
+}
+
+.gzca-security-badge.is-unverified {
+  border-color: #e2c68d;
+  background: #fff8e8;
+  color: #876321;
+}
+
+.gzca-account-hero .gzca-security-badge {
+  border-color: rgba(255, 255, 255, .24);
+  background: rgba(255, 255, 255, .08);
+  color: rgba(255, 255, 255, .86);
+}
+
+.gzca-security-overview {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(280px, 1fr));
+  gap: 12px;
+}
+
+.gzca-security-status,
+.gzca-security-alert,
+.gzca-security-empty {
+  min-width: 0;
+  display: grid;
+  align-content: start;
+  gap: 5px;
+  padding: 14px 16px;
+}
+
+.gzca-security-status {
+  border-top: 3px solid var(--gzca-jade);
+  background: #f5f7f4;
+}
+
+.gzca-security-status span,
+.gzca-security-status small,
+.gzca-security-alert span {
+  color: var(--gzca-muted);
+}
+
+.gzca-security-status span {
+  font-size: 11px;
+  font-weight: 800;
+}
+
+.gzca-security-status strong {
+  overflow-wrap: anywhere;
+  color: var(--gzca-ink);
+  font-size: 17px;
+  line-height: 1.4;
+}
+
+.gzca-security-status small,
+.gzca-security-alert {
+  font-size: 12px;
+  line-height: 1.65;
+}
+
+.gzca-security-alert {
+  border: 0;
+  border-top: 3px solid var(--gzca-line);
+}
+
+.gzca-security-alert.is-warning {
+  border-top-color: var(--gzca-gold);
+  background: #fffaf0;
+}
+
+.gzca-security-alert.is-danger {
+  border-top-color: var(--gzca-seal);
+  background: #fff2ef;
+}
+
+.gzca-security-alert.is-info {
+  border-top-color: var(--gzca-jade);
+  background: #f2f7f4;
+}
+
+.gzca-security-section {
+  margin-top: 20px;
+  border-top: 1px solid var(--gzca-line);
+  padding-top: 18px;
+}
+
+.gzca-security-section-head {
+  display: flex;
+  align-items: baseline;
+  justify-content: space-between;
+  gap: 12px;
+  margin-bottom: 14px;
+}
+
+.gzca-security-section-head strong {
+  color: var(--gzca-ink);
+  font-size: 15px;
+}
+
+.gzca-security-section-head span {
+  color: var(--gzca-muted);
+  font-size: 12px;
+  text-align: right;
+}
+
+.gzca-security-steps {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 0;
+}
+
+.gzca-security-step {
+  min-width: 0;
+  padding-right: 22px;
+}
+
+.gzca-security-step + .gzca-security-step {
+  border-left: 1px solid var(--gzca-line);
+  padding-right: 0;
+  padding-left: 22px;
+}
+
+.gzca-security-step-head {
+  min-height: 30px;
+  display: flex;
+  align-items: center;
+  gap: 9px;
+  margin-bottom: 14px;
+}
+
+.gzca-security-step-head b {
+  width: 26px;
+  height: 26px;
+  display: grid;
+  place-items: center;
+  border-radius: 4px;
+  background: var(--gzca-ink);
+  color: #fff;
+  font-size: 12px;
+}
+
+.gzca-security-step-head strong {
+  color: var(--gzca-ink);
+  font-size: 14px;
+}
+
+.gzca-security-form {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr);
+  gap: 12px;
+  align-items: end;
+}
+
+.gzca-security-form .gzca-button {
+  min-width: 160px;
+  min-height: 42px;
+  justify-self: start;
+}
+
+.gzca-security-device-row {
+  display: grid;
+  grid-template-columns: minmax(220px, .7fr) minmax(0, 1.3fr);
+  gap: 28px;
+  align-items: start;
+}
+
+.gzca-security-device-copy {
+  display: grid;
+  gap: 7px;
+}
+
+.gzca-security-device-copy strong {
+  color: var(--gzca-ink);
+  font-size: 17px;
+}
+
+.gzca-security-device-copy span {
+  color: var(--gzca-muted);
+  font-size: 12px;
+  line-height: 1.7;
+}
+
+.gzca-security-device-form {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) auto;
+  gap: 12px;
+  align-items: end;
+}
+
+.gzca-security-device-form > .gzca-field {
+  grid-column: 1;
+  grid-row: 1;
+}
+
+.gzca-security-device-form > .gzca-button {
+  grid-column: 2;
+  grid-row: 1;
+  min-height: 42px;
+}
+
+.gzca-security-device-confirm {
+  grid-column: 1 / -1;
+  grid-row: 2;
+  margin: 0;
+}
+
+.gzca-security-empty {
+  border-top: 3px solid var(--gzca-gold);
+  background: #f8f7f2;
+}
+
+.gzca-security-empty strong {
+  color: var(--gzca-ink);
+  font-size: 16px;
+}
+
+.gzca-security-empty span {
+  color: var(--gzca-muted);
+  font-size: 12px;
+  line-height: 1.7;
+}
+
+@media (max-width: 900px) {
+  .gzca-account-hero {
+    grid-template-columns: 56px minmax(0, 1fr);
+  }
+
+  .gzca-account-actions {
+    grid-column: 1 / -1;
+    justify-content: flex-start;
+  }
+
+  .gzca-security-steps {
+    grid-template-columns: 1fr;
+    gap: 18px;
+  }
+
+  .gzca-security-step {
+    padding-right: 0;
+  }
+
+  .gzca-security-step + .gzca-security-step {
+    border-top: 1px solid var(--gzca-line);
+    border-left: 0;
+    padding-top: 18px;
+    padding-left: 0;
+  }
+}
+
+@media (max-width: 720px) {
+  .gzca-account-hero {
+    grid-template-columns: 48px minmax(0, 1fr);
+    gap: 13px;
+    padding: 18px;
+  }
+
+  .gzca-account-avatar {
+    width: 46px;
+    height: 46px;
+  }
+
+  .gzca-account-copy h3 {
+    font-size: 21px;
+  }
+
+  .gzca-account-meta {
+    display: grid;
+    gap: 4px;
+  }
+
+  .gzca-account-actions,
+  .gzca-account-actions .gzca-button {
+    width: 100%;
+  }
+
+  .gzca-security-layout {
+    gap: 14px;
+  }
+
+  .gzca-security-panel {
+    padding: 18px;
+  }
+
+  .gzca-security-overview,
+  .gzca-security-steps,
+  .gzca-security-device-row,
+  .gzca-security-device-form {
+    grid-template-columns: 1fr;
+  }
+
+  .gzca-security-section-head {
+    display: grid;
+    gap: 4px;
+  }
+
+  .gzca-security-section-head span {
+    text-align: left;
+  }
+
+  .gzca-security-form .gzca-button,
+  .gzca-security-device-form > .gzca-button {
+    width: 100%;
+    min-width: 0;
+    justify-self: stretch;
+  }
+
+  .gzca-security-device-form > .gzca-field,
+  .gzca-security-device-form > .gzca-button,
+  .gzca-security-device-confirm {
+    grid-column: auto;
+    grid-row: auto;
+  }
+
+  .gzca-security-status,
+  .gzca-security-alert,
+  .gzca-security-empty {
+    padding: 13px;
   }
 }

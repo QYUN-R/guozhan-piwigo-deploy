@@ -18,6 +18,7 @@
       <a href="{$GZCA_URLS.works|escape:'html'}" class="{if $GZCA_TAB eq 'works'}is-active{/if}"><span>图</span>作品管理</a>
       <a href="{$GZCA_URLS.categories|escape:'html'}" class="{if $GZCA_TAB eq 'categories'}is-active{/if}"><span>类</span>分类管理</a>
       <a href="{$GZCA_URLS.contact|escape:'html'}" class="{if $GZCA_TAB eq 'contact'}is-active{/if}"><span>牌</span>品牌与客服</a>
+      <a href="{$GZCA_URLS.security|escape:'html'}" class="{if $GZCA_TAB eq 'security'}is-active{/if}"><span>安</span>账号中心</a>
     </nav>
 
     <div class="gzca-sidebar-footer">
@@ -27,7 +28,7 @@
   </aside>
 
   <main class="gzca-main">
-    <header class="gzca-page-header">
+    <header class="gzca-page-header {if $GZCA_TAB eq 'security'}gzca-page-header-account{/if}">
       <div>
         {if $GZCA_TAB eq 'dashboard'}<p>内容总览</p><h2>工作台</h2>{/if}
         {if $GZCA_TAB eq 'home'}<p>首页视觉与轮播壁纸</p><h2>首页轮播</h2>{/if}
@@ -70,16 +71,17 @@
         {if $GZCA_TAB eq 'works'}<p>编号、封面与上下架</p><h2>作品管理</h2>{/if}
         {if $GZCA_TAB eq 'categories'}<p>主分类与小分类</p><h2>分类管理</h2>{/if}
         {if $GZCA_TAB eq 'contact'}<p>同步前台 Logo 与联系方式</p><h2>品牌与客服</h2>{/if}
+        {if $GZCA_TAB eq 'security'}<p>管理员资料与安全设置</p><h2>个人中心</h2>{/if}
       </div>
       <div class="gzca-header-actions">
-        <div class="gzca-admin-session" aria-label="当前管理员身份">
+        <a class="gzca-admin-session" href="{$GZCA_URLS.security|escape:'html'}" aria-label="查看管理员账号信息" {if $GZCA_TAB eq 'security'}aria-current="page"{/if}>
           <span class="gzca-admin-session-mark">管</span>
           <span class="gzca-admin-session-copy">
             <small>当前{$GZCA_ADMIN_IDENTITY.role|escape:'html'}</small>
             <strong>{$GZCA_ADMIN_IDENTITY.username|escape:'html'}</strong>
             <em>登录有效至 {$GZCA_ADMIN_IDENTITY.expires_at|escape:'html'}</em>
           </span>
-        </div>
+        </a>
         <a class="gzca-button gzca-button-quiet" href="{$GZCA_URLS.gallery|escape:'html'}" target="_blank" rel="noopener">预览网站</a>
         {if $GZCA_TAB neq 'upload'}<a class="gzca-button gzca-button-primary" href="{$GZCA_URLS.upload|escape:'html'}">上传作品</a>{/if}
         <a class="gzca-button gzca-button-danger gzca-logout-button" href="{$GZCA_URLS.logout|escape:'html'}">退出登录</a>
@@ -358,6 +360,158 @@
             <div><button class="gzca-button gzca-button-quiet" type="button" data-category-prev>上一页</button><span data-category-page-label>第 1 / 1 页</span><button class="gzca-button gzca-button-quiet" type="button" data-category-next>下一页</button></div>
           </nav>
         </section>
+      </div>
+    {/if}
+
+    {if $GZCA_TAB eq 'security'}
+      <div class="gzca-account-page">
+        <section class="gzca-account-hero" aria-label="管理员账号资料">
+          <span class="gzca-account-avatar">管</span>
+          <div class="gzca-account-copy">
+            <span>管理员账号</span>
+            <h3>{$GZCA_ADMIN_IDENTITY.username|escape:'html'}</h3>
+            <div class="gzca-account-meta">
+              <span>{$GZCA_ADMIN_IDENTITY.role|escape:'html'}</span>
+              <span>登录有效至 {$GZCA_ADMIN_IDENTITY.expires_at|escape:'html'}</span>
+              <span>{if $GZCA_EMAIL_SECURITY.verified}{$GZCA_EMAIL_SECURITY.masked_email|escape:'html'}{else}恢复邮箱未绑定{/if}</span>
+            </div>
+          </div>
+          <div class="gzca-account-actions">
+            <span class="gzca-security-badge is-verified">当前设备已登录</span>
+            <a class="gzca-button gzca-button-danger" href="{$GZCA_URLS.logout|escape:'html'}">退出当前账号</a>
+          </div>
+        </section>
+
+        <div class="gzca-security-layout">
+          <section id="recovery-email" class="gzca-panel gzca-security-panel">
+            <div class="gzca-panel-head">
+              <div><p>账号找回</p><h3>恢复邮箱</h3></div>
+              <span class="gzca-security-badge {if $GZCA_EMAIL_SECURITY.verified}is-verified{else}is-unverified{/if}">{if $GZCA_EMAIL_SECURITY.verified}已验证{else}待绑定{/if}</span>
+            </div>
+
+            <div class="gzca-security-overview">
+              <div class="gzca-security-status">
+                <span>当前状态</span>
+                {if $GZCA_EMAIL_SECURITY.verified}
+                  <strong>{$GZCA_EMAIL_SECURITY.masked_email|escape:'html'}</strong>
+                  <small>验证时间 {$GZCA_EMAIL_SECURITY.verified_at|escape:'html'}，忘记密码时验证码会发送到此邮箱。</small>
+                {else}
+                  <strong>尚未绑定恢复邮箱</strong>
+                  <small>请由最终客户绑定自己的邮箱，交付方邮箱不会作为默认恢复邮箱。</small>
+                {/if}
+              </div>
+
+              {if !$GZCA_EMAIL_SECURITY.storage_ready}
+                <div class="gzca-security-alert is-danger"><strong>账号安全数据表尚未就绪</strong><span>请先完成插件升级，当前不会写入或替换邮箱。</span></div>
+              {elseif !$GZCA_SECURITY_MAIL.ready}
+                <div class="gzca-security-alert is-warning"><strong>暂时不能发送验证码</strong><span>{$GZCA_SECURITY_MAIL.message|escape:'html'}</span></div>
+              {elseif $GZCA_EMAIL_SECURITY.requires_binding}
+                <div class="gzca-security-alert is-info"><strong>请绑定客户邮箱</strong><span>验证成功后即可用于找回密码和高风险操作确认。</span></div>
+              {/if}
+            </div>
+
+            {if $GZCA_EMAIL_SECURITY.storage_ready and $GZCA_SECURITY_MAIL.ready}
+              <div class="gzca-security-section">
+                <div class="gzca-security-section-head">
+                  <strong>{if $GZCA_EMAIL_SECURITY.verified}更换恢复邮箱{else}绑定恢复邮箱{/if}</strong>
+                  <span>需要当前密码和新邮箱验证码</span>
+                </div>
+                <div class="gzca-security-steps">
+                  <section class="gzca-security-step">
+                    <div class="gzca-security-step-head"><b>1</b><strong>发送验证码</strong></div>
+                    <form class="gzca-security-form" action="{$GZCA_URLS.security|escape:'html'}" method="post">
+                      <input type="hidden" name="pwg_token" value="{$GZCA_TOKEN|escape:'html'}">
+                      <input type="hidden" name="gzca_action" value="send_bind_email_code">
+                      <label class="gzca-field"><span>客户的新邮箱</span><input type="email" name="new_email" value="{$GZCA_SECURITY_FORM.new_email|escape:'html'}" maxlength="255" autocomplete="email" required><small>验证成功前不会替换当前账号资料。</small></label>
+                      <label class="gzca-field"><span>当前管理员密码</span><input type="password" name="current_password" maxlength="256" autocomplete="current-password" required></label>
+                      <button class="gzca-button gzca-button-quiet" type="submit">发送邮箱验证码</button>
+                    </form>
+                  </section>
+
+                  <section class="gzca-security-step">
+                    <div class="gzca-security-step-head"><b>2</b><strong>验证并绑定</strong></div>
+                    <form class="gzca-security-form gzca-security-verify-form" action="{$GZCA_URLS.security|escape:'html'}" method="post">
+                      <input type="hidden" name="pwg_token" value="{$GZCA_TOKEN|escape:'html'}">
+                      <input type="hidden" name="gzca_action" value="verify_bind_email">
+                      <label class="gzca-field"><span>同一个新邮箱</span><input type="email" name="new_email" value="{$GZCA_SECURITY_FORM.new_email|escape:'html'}" maxlength="255" autocomplete="email" required></label>
+                      <label class="gzca-field"><span>六位验证码</span><input type="text" name="verification_code" inputmode="numeric" pattern="[0-9]{6}" maxlength="6" autocomplete="one-time-code" required>{if $GZCA_EMAIL_SECURITY.bind_challenge.active}<small>验证码有效至 {$GZCA_EMAIL_SECURITY.bind_challenge.expires_at|escape:'html'}。</small>{/if}</label>
+                      <label class="gzca-field"><span>再次输入当前密码</span><input type="password" name="current_password" maxlength="256" autocomplete="current-password" required></label>
+                      <button class="gzca-button gzca-button-primary" type="submit">验证并绑定邮箱</button>
+                    </form>
+                  </section>
+                </div>
+              </div>
+            {/if}
+          </section>
+
+          <section id="login-devices" class="gzca-panel gzca-security-panel">
+            <div class="gzca-panel-head">
+              <div><p>登录保护</p><h3>登录设备</h3></div>
+              <span class="gzca-security-badge is-verified">当前设备保留</span>
+            </div>
+            <div class="gzca-security-device-row">
+              <div class="gzca-security-device-copy">
+                <strong>退出其他设备</strong>
+                <span>撤销其他浏览器的会话和记住登录，当前浏览器继续保持登录。</span>
+              </div>
+              <form class="gzca-security-device-form" action="{$GZCA_URLS.security|escape:'html'}#login-devices" method="post">
+                <input type="hidden" name="pwg_token" value="{$GZCA_TOKEN|escape:'html'}">
+                <input type="hidden" name="gzca_action" value="revoke_other_sessions">
+                <label class="gzca-field"><span>当前管理员密码</span><input type="password" name="current_password" maxlength="256" autocomplete="current-password" required></label>
+                <label class="gzca-check gzca-security-device-confirm"><input type="checkbox" name="confirm_other_sessions" value="1" required><span><strong>确认退出其他设备</strong><small>其他设备需要重新输入账号和密码。</small></span></label>
+                <button class="gzca-button gzca-button-danger" type="submit">退出其他设备</button>
+              </form>
+            </div>
+          </section>
+
+          <section class="gzca-panel gzca-security-panel">
+            <div class="gzca-panel-head">
+              <div><p>高风险操作验证</p><h3>修改管理员密码</h3></div>
+              <span class="gzca-security-badge {if $GZCA_EMAIL_SECURITY.verified}is-verified{else}is-unverified{/if}">{if $GZCA_EMAIL_SECURITY.verified}邮箱保护已开启{else}需先绑定邮箱{/if}</span>
+            </div>
+
+            {if $GZCA_EMAIL_SECURITY.verified}
+              <div class="gzca-security-overview">
+                <div class="gzca-security-status">
+                  <span>验证码接收邮箱</span>
+                  <strong>{$GZCA_EMAIL_SECURITY.masked_email|escape:'html'}</strong>
+                  <small>修改成功后，旧登录、记住登录、重置链接和 API Key 都会失效。</small>
+                </div>
+              </div>
+              <div class="gzca-security-section">
+                <div class="gzca-security-steps">
+                  <section class="gzca-security-step">
+                    <div class="gzca-security-step-head"><b>1</b><strong>发送改密验证码</strong></div>
+                    <form class="gzca-security-form" action="{$GZCA_URLS.security|escape:'html'}" method="post">
+                      <input type="hidden" name="pwg_token" value="{$GZCA_TOKEN|escape:'html'}">
+                      <input type="hidden" name="gzca_action" value="send_password_code">
+                      <label class="gzca-field"><span>当前管理员密码</span><input type="password" name="current_password" maxlength="256" autocomplete="current-password" required></label>
+                      <button class="gzca-button gzca-button-quiet" type="submit">发送改密验证码</button>
+                    </form>
+                  </section>
+
+                  <section class="gzca-security-step">
+                    <div class="gzca-security-step-head"><b>2</b><strong>验证并修改密码</strong></div>
+                    <form class="gzca-security-form" action="{$GZCA_URLS.security|escape:'html'}" method="post">
+                      <input type="hidden" name="pwg_token" value="{$GZCA_TOKEN|escape:'html'}">
+                      <input type="hidden" name="gzca_action" value="change_admin_password">
+                      <label class="gzca-field"><span>当前管理员密码</span><input type="password" name="current_password" maxlength="256" autocomplete="current-password" required></label>
+                      <label class="gzca-field"><span>邮箱验证码</span><input type="text" name="verification_code" inputmode="numeric" pattern="[0-9]{6}" maxlength="6" autocomplete="one-time-code" required>{if $GZCA_EMAIL_SECURITY.password_challenge.active}<small>验证码有效至 {$GZCA_EMAIL_SECURITY.password_challenge.expires_at|escape:'html'}。</small>{/if}</label>
+                      <label class="gzca-field"><span>新密码</span><input type="password" name="new_password" minlength="12" maxlength="128" autocomplete="new-password" required></label>
+                      <label class="gzca-field"><span>确认新密码</span><input type="password" name="new_password_confirm" minlength="12" maxlength="128" autocomplete="new-password" required></label>
+                      <button class="gzca-button gzca-button-danger" type="submit">验证并修改密码</button>
+                    </form>
+                  </section>
+                </div>
+              </div>
+            {else}
+              <div class="gzca-security-empty">
+                <strong>请先绑定恢复邮箱</strong>
+                <span>邮箱验证完成后，这里会开放管理员密码修改功能。</span>
+              </div>
+            {/if}
+          </section>
+        </div>
       </div>
     {/if}
 

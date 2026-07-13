@@ -338,6 +338,14 @@ function gzca_validate_admin_session()
     gzca_force_admin_reauthentication('expired');
   }
 
+  $revoked_before = function_exists('gzca_admin_session_revoked_before')
+    ? gzca_admin_session_revoked_before((int)$user['id'])
+    : 0;
+  if ($revoked_before > 0 && $issued_at < $revoked_before)
+  {
+    gzca_force_admin_reauthentication('sessions_revoked');
+  }
+
   return true;
 }
 
@@ -366,6 +374,8 @@ function gzca_prepare_login_notice()
     'reauth' => '后台安全策略已更新，请重新验证管理员身份。',
     'expired' => '管理员登录状态已超过 7 天，请重新输入账号和密码。',
     'unauthorized' => '当前账号没有后台权限，请使用已授权管理员账号登录。',
+    'password_changed' => '管理员密码已更新，旧登录状态和访问密钥已撤销，请使用新密码重新登录。',
+    'sessions_revoked' => '此设备的管理员登录已被撤销，请重新输入账号和密码。',
     );
 
   if (isset($messages[$reason]))
