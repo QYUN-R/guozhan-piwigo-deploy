@@ -1,5 +1,14 @@
 # Guozhan Release History
 
+## guozhan-2026.07.13.4 - 2026-07-13
+
+- Restore the versioned Guozhan login stylesheet that was missing from the live server.
+- Redesign desktop login around the same ink-green gallery visual, cream surface, and seal-red actions as the public website.
+- Add a compact mobile layout that keeps the full login form in the first screen without horizontal overflow.
+- Force a stable light form surface to prevent browser dark-mode distortion.
+- Replace the retired competition wording with current works, categories, homepage carousel, and contact management copy.
+- Add a responsive login-design contract test to guard the stylesheet and breakpoints.
+
 ## guozhan-2026.07.13.3 - 2026-07-13
 
 - Restrict all password logins and administrator sessions to the configured administrator whitelist.

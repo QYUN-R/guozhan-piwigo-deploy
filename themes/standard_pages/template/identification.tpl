@@ -1,6 +1,10 @@
 {combine_css id='standard_pages_css' path="themes/standard_pages/skins/{$STD_PGS_SELECTED_SKIN}.css" order=100}
 {combine_css id='guozhan_login_css' path="themes/standard_pages/guozhan-login.css" order=200}
 {combine_css path="themes/default/vendor/fontello/css/gallery-icon.css" order=-10}
+{html_head}
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<meta name="color-scheme" content="light only">
+{/html_head}
 
 <script>
   var selected_language = "{$language_options[$current_language]|escape:'javascript'}";
@@ -26,14 +30,14 @@
 
   <main class="guozhan-login-shell">
     <section class="guozhan-login-visual" aria-label="后台入口说明">
-      <div class="guozhan-login-art"></div>
       <div class="guozhan-login-copy">
-        <p>客户后台入口</p>
-        <h1>管理作品、分类、比赛与客服信息</h1>
+        <p>图物计划 · 客户内容管理</p>
+        <h1>让作品管理与前台展示保持同步</h1>
+        <span class="guozhan-login-intro">上传作品、维护分类与轮播、更新品牌和客服信息。</span>
         <div class="guozhan-login-points" aria-label="后台功能">
-          <span>作品上传</span>
+          <span>作品管理</span>
           <span>分类同步</span>
-          <span>比赛筛选</span>
+          <span>首页轮播</span>
           <span>品牌客服</span>
         </div>
       </div>
@@ -41,8 +45,8 @@
 
     <section id="login-form" class="guozhan-login-panel" aria-label="登录表单">
       <div class="guozhan-login-panel-head">
-        <p>Sign in</p>
-        <h2>{'Login'|translate|escape:'html'}</h2>
+        <p>Administrator access</p>
+        <h2>管理员登录</h2>
         <span>仅允许已授权管理员登录，登录状态最多保留 7 天。</span>
       </div>
 
