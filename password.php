@@ -14,6 +14,14 @@ define('PHPWG_ROOT_PATH','./');
 include_once( PHPWG_ROOT_PATH.'include/common.inc.php' );
 include_once(PHPWG_ROOT_PATH.'include/functions_mail.inc.php');
 
+if (!headers_sent())
+{
+  header('Cache-Control: no-store, no-cache, must-revalidate, max-age=0');
+  header('Pragma: no-cache');
+  header('Referrer-Policy: no-referrer');
+  header('X-Robots-Tag: noindex, nofollow, noarchive');
+}
+
 // +-----------------------------------------------------------------------+
 // | Check Access and exit when user status is not ok                      |
 // +-----------------------------------------------------------------------+
@@ -22,28 +30,21 @@ check_status(ACCESS_FREE);
 
 trigger_notify('loc_begin_password');
 
-check_input_parameter('action', $_GET, false, '/^(lost|reset|lost_code|reset_end|none)$/');
+check_input_parameter('action', $_GET, false, '/^(lost|sent|reset|lost_code|reset_end|none)$/');
 
 // +-----------------------------------------------------------------------+
 // | Functions                                                             |
 // +-----------------------------------------------------------------------+
 
 /**
- * checks the validity of input parameters, fills $page['errors'] and
- * $page['infos'] and send an email with the verification code
+ * Checks the request and sends a generic, verified-email-only reset link.
  *
  * @return bool
  */
-function process_verification_code()
+function process_password_reset_link_request()
 {
-  global $page, $conf, $logger;
-  
-  if (isset($_SESSION['reset_password_code']))
-  {
-    return true;
-  }
-  
-  // empty param
+  global $page, $conf;
+
   $username_or_email = trim($_POST['username_or_email'] ?? '');
   if (empty($username_or_email))
   {
@@ -51,76 +52,58 @@ function process_verification_code()
     return false;
   }
 
-  // retrievies user by email is not try by username
   $user_id = get_userid_by_email($username_or_email);
-
   if (!is_numeric($user_id))
   {
     $user_id = get_userid($username_or_email);
   }
 
-  // when no user is found, we assign guest_id instead of stopping.
-  // this lets the function behave identically for unknown users,
-  // preventing username/email enumeration through timing or responses.
   $is_user_found = is_numeric($user_id);
-  if (!$is_user_found)
-  {
-    $user_id = $conf['guest_id'];
-  }
-
-  $userdata = getuserdata($user_id, false);
-
-  $status = $userdata['status'];
-
   if ($is_user_found)
   {
-    // block early for generic or guest user because
-    // we don't consider theses users has sensible for username/email enumeration
-    if (is_a_guest($status) or is_generic($status))
+    $userdata = getuserdata($user_id, false);
+    $can_send = is_array($userdata)
+      && !is_a_guest($userdata['status'])
+      && !is_generic($userdata['status'])
+      && function_exists('gzca_admin_password_recovery_allowed')
+      && gzca_admin_password_recovery_allowed((int)$user_id, $userdata['email']);
+
+    $retry_after = 0;
+    if ($can_send
+        && function_exists('gzca_password_reset_delivery_allowed')
+        && gzca_password_reset_delivery_allowed((int)$user_id, $retry_after))
     {
-      $page['errors']['password_form_error'] = l10n('Password reset is not allowed for this user');
-      return false;
+      $previous_duration = $conf['password_reset_duration'];
+      $conf['password_reset_duration'] = min((int)$previous_duration, GZCA_PASSWORD_RESET_LINK_TTL);
+      $generated_link = generate_password_link((int)$user_id, false);
+      $conf['password_reset_duration'] = $previous_duration;
+
+      if (function_exists('gzca_record_password_reset_delivery'))
+      {
+        gzca_record_password_reset_delivery((int)$user_id);
+      }
+
+      switch_lang_to($userdata['language']);
+      $template_mail = pwg_generate_reset_password_mail(
+        $userdata['username'],
+        $generated_link['password_link'],
+        $conf['gallery_title'],
+        $generated_link['time_validation']
+        );
+      $mail_sent = @pwg_mail($userdata['email'], $template_mail);
+      switch_lang_back();
+
+      if (!$mail_sent)
+      {
+        deactivate_password_reset_key((int)$user_id);
+        pwg_activity('user', (int)$user_id, 'reset_password_mail_failure');
+      }
+      else
+      {
+        pwg_activity('user', (int)$user_id, 'reset_password_mail_sent');
+      }
     }
-
-    // check lockout
-    if (
-      isset($userdata['preferences']['reset_password_forbidden_until'])
-      and $userdata['preferences']['reset_password_forbidden_until'] > time()
-    )
-    {
-      $page['errors']['password_form_error'] = l10n('Too many attempts, please try later..');
-      return false;
-    }
   }
-
-  // check if we want to skip email sending
-  // if user is guest, generic or doesn't have email
-  $skip_mail = !$is_user_found or empty($userdata['email']);
-
-  // send mail with verification code to user
-  switch_lang_to($userdata['language']);
-  $user_code = generate_user_code();
-  $template_mail = pwg_generate_code_verification_mail($user_code['code']);
-  $mail_send = true;
-  if (!$skip_mail)
-  {
-    $mail_send = pwg_mail($userdata['email'], $template_mail);
-  }
-  switch_lang_back();
-
-  if (!$mail_send)
-  {
-    $page['errors']['password_form_error'] = l10n('Email sending failed');
-    return false;
-  }
-
-  $_SESSION['reset_password_code'] = [
-      'secret' => $user_code['secret'],
-      'attempts' => 0,
-      'user_id' => $is_user_found ? $user_id : null,
-      'created_at' => time(),
-      'ttl' => min($conf['password_reset_code_duration'], 900) // max 15 min
-    ];
 
   return true;
 }
@@ -203,11 +186,22 @@ function process_password_request()
   $user = build_user($user_id, false);
   userprefs_delete_param('reset_password_forbidden_until');
 
+  if (function_exists('gzca_admin_account_is_allowed')
+      && function_exists('gzca_admin_password_recovery_allowed')
+      && gzca_admin_account_is_allowed($user)
+      && !gzca_admin_password_recovery_allowed((int)$user_id, $user['email']))
+  {
+    $user = $save_user;
+    $page['errors']['password_form_error'] = l10n('Invalid verification code');
+    return false;
+  }
+
   $_SESSION['valid_reset_password_code'] = array( 
     'user_id' => $user_id,
     'username' => $user['username'],
     'email' => $user['email'],
     'language' => $user['language'],
+    'expires_at' => time() + GZCA_SECURITY_CODE_TTL,
   );
   $status = $user['status'] ?? null;
   $has_no_email = empty($user['email']);
@@ -261,7 +255,24 @@ SELECT
         return false;
       }
 
+      if (function_exists('gzca_admin_account_is_allowed')
+          && function_exists('gzca_admin_password_recovery_allowed'))
+      {
+        $reset_account = getuserdata((int)$row['user_id'], false);
+        $reset_account['id'] = (int)$row['user_id'];
+        if (gzca_admin_account_is_allowed($reset_account)
+            && !gzca_admin_password_recovery_allowed((int)$row['user_id'], $reset_account['email']))
+        {
+          $page['errors']['password_page_error'] = l10n('Invalid key');
+          return false;
+        }
+      }
+
       $user_id = $row['user_id'];
+      $GLOBALS['gzca_password_reset_key_context'] = array(
+        'user_id' => (int)$user_id,
+        'activation_key_hash' => (string)$row['activation_key'],
+        );
       break;
     }
   }
@@ -315,6 +326,12 @@ function reset_password()
       $page['errors']['password_form_error'] = $password_policy_error;
       return false;
     }
+  }
+
+  if (isset($_GET['key']) && !consume_password_reset_key($user_id))
+  {
+    $page['errors']['password_form_error'] = l10n('Invalid key or code');
+    return false;
   }
     
   single_update(
@@ -382,11 +399,47 @@ function reset_password_key()
   return $user_id;
 }
 
+function consume_password_reset_key($user_id)
+{
+  $context = isset($GLOBALS['gzca_password_reset_key_context'])
+    ? $GLOBALS['gzca_password_reset_key_context']
+    : null;
+  unset($GLOBALS['gzca_password_reset_key_context']);
+  if (!is_array($context)
+      || (int)$context['user_id'] !== (int)$user_id
+      || empty($context['activation_key_hash']))
+  {
+    return false;
+  }
+
+  $activation_key_hash = pwg_db_real_escape_string((string)$context['activation_key_hash']);
+  pwg_query('UPDATE '.USER_INFOS_TABLE.'
+  SET activation_key = NULL,
+      activation_key_expire = NULL
+  WHERE user_id = '.(int)$user_id.'
+    AND activation_key = \''.$activation_key_hash.'\'
+    AND activation_key_expire > NOW()
+;');
+
+  return pwg_db_changes() === 1;
+}
+
 function reset_password_code()
 {
   if (!isset($_SESSION['valid_reset_password_code']))
   {
     return false;
+  }
+
+  if (function_exists('gzca_password_reset_grant_user_id'))
+  {
+    $grant =& $_SESSION['valid_reset_password_code'];
+    $user_id = gzca_password_reset_grant_user_id($grant);
+    if (false === $user_id)
+    {
+      unset($_SESSION['valid_reset_password_code']);
+    }
+    return $user_id;
   }
 
   return $_SESSION['valid_reset_password_code']['user_id'] ?? false;
@@ -401,10 +454,10 @@ if (isset($_POST['submit']))
   
   if ('lost' == $_GET['action'])
   {
-    if (process_verification_code())
+    if (process_password_reset_link_request())
     {
-      $page['infos'][] = l10n('If your account exists, a verification code has been sent to your email address.');
-      $page['action'] = 'lost_code';
+      $page['infos'][] = '如果账号存在且已绑定验证邮箱，重置链接已经发送。';
+      $page['action'] = 'sent';
     }
   }
 
@@ -464,7 +517,7 @@ if (!isset($page['action']))
   {
     $page['action'] = 'lost';
   }
-  elseif (in_array($_GET['action'], array('lost', 'lost_code', 'reset', 'none')))
+  elseif (in_array($_GET['action'], array('lost', 'sent', 'lost_code', 'reset', 'none')))
   {
     $page['action'] = $_GET['action'];
   }
@@ -472,7 +525,8 @@ if (!isset($page['action']))
 
 if ('reset' == $page['action'])
 {
-  if ( (!isset($_GET['key']) and (is_a_guest() or is_generic())) and !isset($_SESSION['valid_reset_password_code']) )
+  $valid_reset_code_user_id = reset_password_code();
+  if ( (!isset($_GET['key']) and (is_a_guest() or is_generic())) and !is_numeric($valid_reset_code_user_id) )
   {
     redirect(get_gallery_home_url());
   }

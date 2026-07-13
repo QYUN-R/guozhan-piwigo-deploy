@@ -16,6 +16,9 @@ define('GZCA_ADMIN_SESSION_TTL', 604800);
 define('GZCA_SECURITY_CODE_TTL', 600);
 define('GZCA_SECURITY_RESEND_COOLDOWN', 60);
 define('GZCA_SECURITY_MAX_ATTEMPTS', 5);
+define('GZCA_PASSWORD_RESET_LINK_TTL', 900);
+define('GZCA_PASSWORD_RESET_RESEND_COOLDOWN', 60);
+define('GZCA_PASSWORD_RESET_HOURLY_LIMIT', 5);
 
 global $conf, $prefixeTable;
 $conf['authorize_remembering'] = true;

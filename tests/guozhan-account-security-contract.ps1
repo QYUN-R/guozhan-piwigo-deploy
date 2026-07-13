@@ -13,12 +13,18 @@ $template = Get-Content -Raw (Join-Path $root 'plugins\GuozhanClientAdmin\templa
 $style = Get-Content -Raw (Join-Path $root 'plugins\GuozhanClientAdmin\assets\admin.css')
 $adminHeader = Get-Content -Raw (Join-Path $root 'admin\themes\default\template\header.tpl')
 $password = Get-Content -Raw (Join-Path $root 'password.php')
+$passwordTemplate = Get-Content -Raw (Join-Path $root 'themes\standard_pages\template\password.tpl')
 $failures = [System.Collections.Generic.List[string]]::new()
 
 if ($main -notmatch "define\('GZCA_SECURITY_CODE_TTL',\s*600\)" -or
     $main -notmatch "define\('GZCA_SECURITY_RESEND_COOLDOWN',\s*60\)" -or
     $main -notmatch "define\('GZCA_SECURITY_MAX_ATTEMPTS',\s*5\)") {
     $failures.Add('Email security code lifetime, resend cooldown, and attempt limit are not fixed securely.')
+}
+if ($main -notmatch "define\('GZCA_PASSWORD_RESET_LINK_TTL',\s*900\)" -or
+    $main -notmatch "define\('GZCA_PASSWORD_RESET_RESEND_COOLDOWN',\s*60\)" -or
+    $main -notmatch "define\('GZCA_PASSWORD_RESET_HOURLY_LIMIT',\s*5\)") {
+    $failures.Add('Administrator reset links do not have fixed expiry and delivery-rate limits.')
 }
 if ($main -notmatch 'GZCA_ADMIN_SECURITY_TABLE') {
     $failures.Add('The plugin does not define a dedicated administrator email-verification table.')
@@ -38,13 +44,19 @@ if ($maintain -notmatch 'sessions_revoked_before' -or
     $maintain -notmatch 'ensure_column\(\$admin_security_table,\s*''sessions_revoked_before''') {
     $failures.Add('The plugin installer does not persist the cutoff used to revoke remembered sessions on other devices.')
 }
+if ($maintain -notmatch 'password_reset_sent_at' -or
+    $maintain -notmatch 'password_reset_window_started_at' -or
+    $maintain -notmatch 'password_reset_window_count') {
+    $failures.Add('Password-reset delivery rate limits are not persisted per administrator.')
+}
 if ($functions -notmatch 'function\s+gzca_admin_email_security_status\s*\(' -or
     $functions -notmatch 'hash_equals\s*\(' -or
     $functions -notmatch 'verified_email_hash') {
     $failures.Add('The bound address is not checked against a persistent verified-email fingerprint.')
 }
 if ($functions -notmatch 'function\s+gzca_mask_email\s*\(' -or
-    $functions -notmatch 'function\s+gzca_security_mail_status\s*\(') {
+    $functions -notmatch 'function\s+gzca_security_mail_status\s*\(' -or
+    $functions -notmatch 'in_array\(\$smtp_secure,\s*array\(''ssl'',\s*''tls''\),\s*true\)') {
     $failures.Add('The UI cannot safely report a masked recovery address and SMTP readiness.')
 }
 if ($functions -notmatch 'function\s+gzca_send_admin_security_code\s*\(' -or
@@ -52,6 +64,12 @@ if ($functions -notmatch 'function\s+gzca_send_admin_security_code\s*\(' -or
     $functions -notmatch 'pwg_mail\s*\(' -or
     $functions -notmatch 'if\s*\(\s*!\s*\$mail_sent\s*\)') {
     $failures.Add('Security challenges are not sent through Piwigo mail with explicit delivery-failure handling.')
+}
+if ($functions -notmatch 'function\s+gzca_admin_password_recovery_allowed\s*\(' -or
+    $functions -notmatch 'function\s+gzca_password_reset_delivery_allowed\s*\(' -or
+    $functions -notmatch 'function\s+gzca_record_password_reset_delivery\s*\(' -or
+    $functions -notmatch 'GZCA_PASSWORD_RESET_HOURLY_LIMIT') {
+    $failures.Add('Administrator password recovery is not restricted to verified email with persistent rate limiting.')
 }
 $challengeAssignment = [regex]::Match(
     $functions,
@@ -174,9 +192,17 @@ if ($adminHeader -notmatch '\$lang_info\.code eq ''cn''\}zh-CN' -or
 if ($style -notmatch 'body#theAdminPage\s+#footer') {
     $failures.Add('The native fixed Piwigo footer can overlap the custom administrator on mobile.')
 }
-if ($password -notmatch 'if\s*\(\s*!\s*\$mail_send\s*\)' -or
+if ($password -notmatch 'gzca_admin_password_recovery_allowed\s*\(' -or
+    $password -notmatch 'generate_password_link\s*\(' -or
+    $password -notmatch 'pwg_generate_reset_password_mail\s*\(' -or
+    $password -notmatch '\$page\[''action''\]\s*=\s*''sent''' -or
     $password -notmatch 'gzca_revoke_user_credentials\s*\(\s*\$user_id\s*\)') {
-    $failures.Add('The built-in forgot-password path still accepts failed mail delivery or leaves credentials active after reset.')
+    $failures.Add('Forgot-password does not send a generic, verified-email-only one-time link or revoke credentials after reset.')
+}
+if ([regex]::Matches($password, 'gzca_admin_password_recovery_allowed\s*\(').Count -lt 3 -or
+    $password -notmatch 'check_password_reset_key[\s\S]{0,2500}gzca_admin_password_recovery_allowed' -or
+    $password -notmatch 'process_password_request[\s\S]{0,3000}gzca_admin_password_recovery_allowed') {
+    $failures.Add('Legacy reset links or verified-code grants can bypass the current verified recovery-email state.')
 }
 if ($password -notmatch 'gzca_validate_new_admin_password\s*\(' -or
     $password -notmatch 'gzca_admin_account_is_allowed\s*\(') {
@@ -186,6 +212,26 @@ $resetKeyFunction = [regex]::Match($password, 'function\s+reset_password_key\s*\
 if (-not $resetKeyFunction.Success -or
     $resetKeyFunction.Value -match 'deactivate_password_reset_key|deactivate_user_auth_keys') {
     $failures.Add('A rejected new password can consume the reset link before the password policy passes.')
+}
+if ($password -notmatch 'function\s+consume_password_reset_key\s*\(' -or
+    $password -notmatch 'activation_key\s*=\s*NULL' -or
+    $password -notmatch 'pwg_db_changes\s*\(\s*\)\s*===\s*1' -or
+    $password -notmatch 'consume_password_reset_key\s*\([\s\S]{0,500}single_update\s*\(\s*USERS_TABLE') {
+    $failures.Add('Password-reset links are not atomically consumed before the password update.')
+}
+if ($password -notmatch "'expires_at'\s*=>\s*time\(\)\s*\+\s*GZCA_SECURITY_CODE_TTL" -or
+    $password -notmatch 'function\s+reset_password_code[\s\S]{0,600}unset\(\$_SESSION\[''valid_reset_password_code''\]\)' -or
+    $functions -notmatch 'function\s+gzca_password_reset_grant_user_id[\s\S]{0,500}expires_at[\s\S]{0,500}\$grant\s*=\s*null') {
+    $failures.Add('A verified legacy email code can leave an unbounded password-reset grant in the session.')
+}
+if ($passwordTemplate -notmatch '\$action eq ''sent''' -or
+    $passwordTemplate -notmatch '链接仅可使用一次' -or
+    $passwordTemplate -notmatch '发送重置链接' -or
+    $passwordTemplate -notmatch '<meta name="referrer" content="no-referrer">' -or
+    $password -notmatch "Cache-Control: no-store" -or
+    $password -notmatch "Referrer-Policy: no-referrer" -or
+    $password -notmatch "X-Robots-Tag: noindex") {
+    $failures.Add('The password page does not present the secure one-time-link recovery flow.')
 }
 
 if ($failures.Count -gt 0) {

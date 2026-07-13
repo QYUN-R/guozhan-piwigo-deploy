@@ -42,7 +42,8 @@ function gzca_admin_security_record($user_id)
   }
 
   $result = pwg_query('
-SELECT user_id, verified_email_hash, email_verified_at, password_changed_at, sessions_revoked_before, updated_at
+SELECT user_id, verified_email_hash, email_verified_at, password_changed_at, sessions_revoked_before,
+       password_reset_sent_at, password_reset_window_started_at, password_reset_window_count, updated_at
   FROM '.GZCA_ADMIN_SECURITY_TABLE.'
   WHERE user_id = '.$user_id.'
   LIMIT 1
@@ -90,6 +91,133 @@ function gzca_admin_email_security_status($user_id=null)
     );
 }
 
+function gzca_admin_password_recovery_allowed($user_id, $email='')
+{
+  $user_id = (int)$user_id;
+  $account = $user_id > 0 ? getuserdata($user_id, false) : array();
+  if (!is_array($account))
+  {
+    return false;
+  }
+
+  $account['id'] = $user_id;
+  if (!gzca_admin_account_is_allowed($account))
+  {
+    return false;
+  }
+
+  $status = gzca_admin_email_security_status($user_id);
+  $expected = gzca_email_fingerprint(isset($status['email']) ? $status['email'] : '');
+  $candidate = gzca_email_fingerprint('' === (string)$email ? (isset($account['email']) ? $account['email'] : '') : $email);
+  return !empty($status['storage_ready'])
+    && !empty($status['verified'])
+    && '' !== $expected
+    && '' !== $candidate
+    && hash_equals($expected, $candidate);
+}
+
+function gzca_password_reset_rate_state($record, $now=null)
+{
+  $record = is_array($record) ? $record : array();
+  $now = null === $now ? time() : (int)$now;
+  $last_sent = !empty($record['password_reset_sent_at'])
+    ? strtotime((string)$record['password_reset_sent_at'])
+    : 0;
+  $window_started = !empty($record['password_reset_window_started_at'])
+    ? strtotime((string)$record['password_reset_window_started_at'])
+    : 0;
+  $window_count = isset($record['password_reset_window_count'])
+    ? max(0, (int)$record['password_reset_window_count'])
+    : 0;
+  $retry_after = 0;
+
+  if (false !== $last_sent && $last_sent > 0 && $last_sent + GZCA_PASSWORD_RESET_RESEND_COOLDOWN > $now)
+  {
+    $retry_after = max($retry_after, $last_sent + GZCA_PASSWORD_RESET_RESEND_COOLDOWN - $now);
+  }
+  if (false !== $window_started
+      && $window_started > 0
+      && $window_started + 3600 > $now
+      && $window_count >= GZCA_PASSWORD_RESET_HOURLY_LIMIT)
+  {
+    $retry_after = max($retry_after, $window_started + 3600 - $now);
+  }
+
+  return array(
+    'allowed' => 0 === $retry_after,
+    'retry_after' => $retry_after,
+    'window_started' => false === $window_started ? 0 : (int)$window_started,
+    'window_count' => $window_count,
+    );
+}
+
+function gzca_password_reset_delivery_allowed($user_id, &$retry_after=0)
+{
+  $user_id = (int)$user_id;
+  $retry_after = 0;
+  if ($user_id <= 0 || !gzca_database_table_exists(GZCA_ADMIN_SECURITY_TABLE))
+  {
+    return false;
+  }
+
+  $state = gzca_password_reset_rate_state(gzca_admin_security_record($user_id));
+  $retry_after = (int)$state['retry_after'];
+  return !empty($state['allowed']);
+}
+
+function gzca_record_password_reset_delivery($user_id)
+{
+  $user_id = (int)$user_id;
+  if ($user_id <= 0 || !gzca_database_table_exists(GZCA_ADMIN_SECURITY_TABLE))
+  {
+    return false;
+  }
+
+  $now = time();
+  $record = gzca_admin_security_record($user_id);
+  $state = gzca_password_reset_rate_state($record, $now);
+  $window_started = (int)$state['window_started'];
+  $window_count = (int)$state['window_count'];
+  if ($window_started <= 0 || $window_started + 3600 <= $now)
+  {
+    $window_started = $now;
+    $window_count = 0;
+  }
+
+  $data = array(
+    'password_reset_sent_at' => date('Y-m-d H:i:s', $now),
+    'password_reset_window_started_at' => date('Y-m-d H:i:s', $window_started),
+    'password_reset_window_count' => min(255, $window_count + 1),
+    'updated_at' => date('Y-m-d H:i:s', $now),
+    );
+  if (null === $record)
+  {
+    $data['user_id'] = $user_id;
+    single_insert(GZCA_ADMIN_SECURITY_TABLE, $data);
+  }
+  else
+  {
+    single_update(GZCA_ADMIN_SECURITY_TABLE, $data, array('user_id' => $user_id));
+  }
+
+  return true;
+}
+
+function gzca_password_reset_grant_user_id(&$grant, $now=null)
+{
+  $now = null === $now ? time() : (int)$now;
+  if (!is_array($grant)
+      || empty($grant['user_id'])
+      || empty($grant['expires_at'])
+      || (int)$grant['expires_at'] <= $now)
+  {
+    $grant = null;
+    return false;
+  }
+
+  return (int)$grant['user_id'];
+}
+
 function gzca_redirect_admin_profile_to_security()
 {
   global $user;
@@ -129,10 +257,12 @@ function gzca_security_mail_status()
   $smtp_host = isset($conf['smtp_host']) ? trim((string)$conf['smtp_host']) : '';
   $smtp_user = isset($conf['smtp_user']) ? trim((string)$conf['smtp_user']) : '';
   $smtp_password = isset($conf['smtp_password']) ? (string)$conf['smtp_password'] : '';
+  $smtp_secure = isset($conf['smtp_secure']) ? strtolower(trim((string)$conf['smtp_secure'])) : '';
   $sender_email = gzca_normalize_email(isset($conf['mail_sender_email']) ? $conf['mail_sender_email'] : '');
   $ready = '' !== $smtp_host
     && '' !== $smtp_user
     && '' !== $smtp_password
+    && in_array($smtp_secure, array('ssl', 'tls'), true)
     && '' !== $sender_email
     && false !== filter_var($sender_email, FILTER_VALIDATE_EMAIL);
 
@@ -140,7 +270,7 @@ function gzca_security_mail_status()
     'ready' => $ready,
     'message' => $ready
       ? '系统发件服务已就绪，验证码会由独立服务邮箱发送。'
-      : '系统发件邮箱尚未完成服务器私有配置，暂时不能发送验证码。请先配置独立 SMTP 发件账号。',
+      : '系统发件邮箱尚未完成服务器私有 TLS/SSL SMTP 配置，暂时不能发送验证码。请先配置独立 SMTP 发件账号。',
     );
 }
 

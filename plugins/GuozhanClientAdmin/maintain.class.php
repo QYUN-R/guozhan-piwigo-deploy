@@ -149,12 +149,18 @@ CREATE TABLE IF NOT EXISTS `'.$admin_security_table.'` (
   `email_verified_at` DATETIME DEFAULT NULL,
   `password_changed_at` DATETIME DEFAULT NULL,
   `sessions_revoked_before` DATETIME DEFAULT NULL,
+  `password_reset_sent_at` DATETIME DEFAULT NULL,
+  `password_reset_window_started_at` DATETIME DEFAULT NULL,
+  `password_reset_window_count` TINYINT UNSIGNED NOT NULL DEFAULT 0,
   `updated_at` DATETIME DEFAULT NULL,
   PRIMARY KEY (`user_id`)
 ) ENGINE=MyISAM DEFAULT CHARSET=utf8mb4
 ;');
 
     $this->ensure_column($admin_security_table, 'sessions_revoked_before', 'DATETIME DEFAULT NULL AFTER `password_changed_at`');
+    $this->ensure_column($admin_security_table, 'password_reset_sent_at', 'DATETIME DEFAULT NULL AFTER `sessions_revoked_before`');
+    $this->ensure_column($admin_security_table, 'password_reset_window_started_at', 'DATETIME DEFAULT NULL AFTER `password_reset_sent_at`');
+    $this->ensure_column($admin_security_table, 'password_reset_window_count', 'TINYINT UNSIGNED NOT NULL DEFAULT 0 AFTER `password_reset_window_started_at`');
 
     if (empty($conf['gzca_config']))
     {

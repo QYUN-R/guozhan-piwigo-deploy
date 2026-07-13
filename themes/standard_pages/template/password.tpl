@@ -2,8 +2,9 @@
 {combine_css id='guozhan_password_css' path="themes/standard_pages/guozhan-password.css" order=200}
 {combine_css path="themes/default/vendor/fontello/css/gallery-icon.css" order=-10}
 {html_head}
-<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
-<meta name="color-scheme" content="light only">
+  <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+  <meta name="color-scheme" content="light only">
+  <meta name="referrer" content="no-referrer">
 {/html_head}
 
 <script>
@@ -28,7 +29,8 @@
   <main class="guozhan-password-shell">
     <section id="password-form" class="guozhan-password-panel" aria-label="密码找回表单">
       <div class="guozhan-password-panel-head">
-        {if $action eq 'lost'}<h2>找回管理员密码</h2><span>验证码将发送至已验证的恢复邮箱</span>{/if}
+        {if $action eq 'lost'}<h2>找回管理员密码</h2><span>重置链接将发送至已验证的恢复邮箱</span>{/if}
+        {if $action eq 'sent'}<h2>查收重置邮件</h2><span>链接仅可使用一次，15 分钟内有效</span>{/if}
         {if $action eq 'lost_code'}<h2>验证邮箱验证码</h2><span>输入邮件中的六位数字</span>{/if}
         {if $action eq 'reset'}<h2>{if isset($is_first_login)}设置管理员密码{else}设置新密码{/if}</h2><span>至少 12 位，包含字母和数字</span>{/if}
         {if $action eq 'reset_end'}<h2>密码更新完成</h2><span>请使用新密码重新登录</span>{/if}
@@ -50,7 +52,7 @@
               <span>管理员账号或恢复邮箱</span>
               <span class="guozhan-password-input"><i class="gallery-icon-user-2"></i><input type="text" id="username_or_email" name="username_or_email" maxlength="100" value="{if isset($username_or_email)}{$username_or_email|escape:'html'}{/if}" autocomplete="username" autofocus required></span>
             </label>
-            <button type="submit" name="submit" class="guozhan-password-submit">发送邮箱验证码</button>
+            <button type="submit" name="submit" class="guozhan-password-submit">发送重置链接</button>
           {elseif $action eq 'lost_code'}
             <div class="guozhan-password-alert is-success" role="status"><p>如果账号存在，验证码已发送到已验证邮箱。</p></div>
             <label class="guozhan-password-field" for="user_code">
@@ -78,10 +80,12 @@
             <div class="guozhan-password-alert is-error" role="alert"><p>{$errors['password_form_error']|escape:'html'}</p></div>
           {/if}
         </form>
+      {elseif $action eq 'sent'}
+        <div class="guozhan-password-result is-success"><span>✓</span><strong>请检查恢复邮箱</strong><p>如果账号存在且邮箱已经验证，系统会发送一封密码重置邮件。新链接会使旧链接失效。</p><a href="{$ROOT_URL|escape:'html'}identification.php">返回登录</a></div>
       {elseif $action eq 'reset_end'}
         <div class="guozhan-password-result is-success"><span>✓</span><strong>管理员密码已更新</strong><p>旧登录状态和访问密钥已经失效，请重新验证身份。</p><a href="{$ROOT_URL|escape:'html'}identification.php">返回登录</a></div>
       {else}
-        <div class="guozhan-password-result is-error"><span>!</span><strong>当前找回链接无效或已过期</strong><p>请返回登录页重新发送邮箱验证码。</p><a href="{$ROOT_URL|escape:'html'}password.php?action=lost">重新找回密码</a></div>
+        <div class="guozhan-password-result is-error"><span>!</span><strong>当前找回链接无效或已过期</strong><p>请返回登录页重新发送一次性重置链接。</p><a href="{$ROOT_URL|escape:'html'}password.php?action=lost">重新找回密码</a></div>
       {/if}
 
       <div class="guozhan-password-secondary"><a href="{$ROOT_URL|escape:'html'}identification.php">返回管理员登录</a></div>
