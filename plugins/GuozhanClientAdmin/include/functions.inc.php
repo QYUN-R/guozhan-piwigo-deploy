@@ -2822,6 +2822,10 @@ function gzca_prepare_work_row($row)
     $row['category_leaf_name'] = $row['category_id'] > 0 ? '直接上传 / 全部作品' : '未分类';
     $row['category_display_name'] = $row['category_board_name'].' / '.$row['category_leaf_name'];
   }
+  $row['category_cover_image_id'] = isset($row['category_cover_image_id']) ? (int)$row['category_cover_image_id'] : 0;
+  $row['is_category_cover'] = $row['category_id'] > 0
+    && $row['category_cover_image_id'] > 0
+    && (int)$row['id'] === $row['category_cover_image_id'];
   return $row;
 }
 
@@ -2845,6 +2849,45 @@ SELECT COUNT(*)
   single_update(
     CATEGORIES_TABLE,
     array('representative_picture_id' => $image_id),
+    array('id' => $category_id)
+    );
+
+  if (defined('USER_CACHE_CATEGORIES_TABLE'))
+  {
+    pwg_query(
+      'UPDATE '.USER_CACHE_CATEGORIES_TABLE.' SET user_representative_picture_id = NULL WHERE cat_id = '.$category_id.';'
+      );
+  }
+  return true;
+}
+
+function gzca_unset_category_cover($category_id, $image_id=0)
+{
+  $category_id = (int)$category_id;
+  $image_id = (int)$image_id;
+  if ($category_id < 1)
+  {
+    return false;
+  }
+
+  $result = pwg_query(
+    'SELECT representative_picture_id FROM '.CATEGORIES_TABLE.' WHERE id = '.$category_id.' LIMIT 1;'
+    );
+  if (pwg_db_num_rows($result) === 0)
+  {
+    return false;
+  }
+
+  $category = pwg_db_fetch_assoc($result);
+  $current_cover_id = isset($category['representative_picture_id']) ? (int)$category['representative_picture_id'] : 0;
+  if ($current_cover_id < 1 || ($image_id > 0 && $current_cover_id !== $image_id))
+  {
+    return false;
+  }
+
+  single_update(
+    CATEGORIES_TABLE,
+    array('representative_picture_id' => null),
     array('id' => $category_id)
     );
 

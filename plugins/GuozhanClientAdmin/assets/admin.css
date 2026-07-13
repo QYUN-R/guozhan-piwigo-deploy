@@ -2420,6 +2420,59 @@ body#theAdminPage .eiw .errors {
   border-color: #60786b;
   background: #e5f0e9;
 }
+
+.gzca-cover-help {
+  display: grid;
+  grid-template-columns: max-content minmax(0, 1fr);
+  gap: 10px;
+  border: 1px solid #e7d8b9;
+  border-radius: 5px;
+  background: #fffaf0;
+  padding: 10px 12px;
+  color: var(--gzca-muted);
+  font-size: 11px;
+}
+
+.gzca-cover-help strong {
+  color: #7c5d20;
+}
+
+.gzca-cover-badge {
+  display: inline-flex;
+  width: fit-content;
+  max-width: 100%;
+  align-items: center;
+  margin-top: 4px;
+  border-radius: 999px;
+  background: #f3e6bd;
+  padding: 2px 7px;
+  color: #725515;
+  font-size: 9px;
+  font-style: normal;
+  font-weight: 800;
+  line-height: 1.35;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.gzca-work-table .gzca-row-actions .gzca-row-cover-on {
+  border-color: #d9c58d;
+  background: #fff9e8;
+  color: #7b5b13;
+}
+
+.gzca-work-table .gzca-row-actions .gzca-row-cover-off {
+  border-color: #d9b7ad;
+  background: #fff3ef;
+  color: #9b432e;
+}
+
+@media (max-width: 760px) {
+  .gzca-cover-help {
+    grid-template-columns: 1fr;
+  }
+}
 .gzca-confirm-layer,
 .gzca-confirm-layer * {
   box-sizing: border-box;

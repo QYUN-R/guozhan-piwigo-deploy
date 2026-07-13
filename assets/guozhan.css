@@ -601,6 +601,28 @@ body[data-home-page] .section-gallery-stream .container {
   z-index: 2;
 }
 
+.directory-cover-link {
+  position: relative;
+  z-index: 2;
+  display: block;
+  aspect-ratio: 16 / 9;
+  overflow: hidden;
+  margin: -30px -30px 0;
+  background: rgba(217, 203, 181, .35);
+}
+
+.directory-cover {
+  width: 100%;
+  height: 100%;
+  display: block;
+  object-fit: cover;
+  transition: transform 220ms ease;
+}
+
+.directory-cover-link:hover .directory-cover {
+  transform: scale(1.025);
+}
+
 .directory-card::after {
   content: attr(data-index);
   position: absolute;
@@ -677,6 +699,10 @@ body[data-categories-page] .directory-card {
   min-height: 208px;
   gap: 20px;
   padding: 22px;
+}
+
+body[data-categories-page] .directory-cover-link {
+  margin: -22px -22px 0;
 }
 
 body[data-categories-page] .directory-card::after {
@@ -907,6 +933,30 @@ body[data-home-page] [data-od-id="home-directory"] .directory.compact-directory:
   transition: border-color 160ms ease, box-shadow 160ms ease, color 160ms ease, transform 120ms ease;
 }
 
+.quick-category-cover {
+  position: absolute;
+  inset: 0;
+  width: 100%;
+  height: 100%;
+  object-fit: cover;
+}
+
+.quick-category-card.has-cover::after {
+  content: "";
+  position: absolute;
+  inset: 0;
+  z-index: 1;
+  background: linear-gradient(90deg, rgba(23, 32, 30, .82), rgba(23, 32, 30, .42));
+}
+
+.quick-category-card.has-cover {
+  color: #fffdf8;
+}
+
+.quick-category-card.has-cover small {
+  color: rgba(255, 253, 248, .82);
+}
+
 .quick-category-card:hover {
   border-color: var(--seal);
   box-shadow: 0 16px 36px rgba(169, 70, 47, .1);
@@ -938,6 +988,7 @@ body[data-home-page] [data-od-id="home-directory"] .directory.compact-directory:
 
 .quick-category-index {
   position: absolute;
+  z-index: 2;
   right: 10px;
   top: 6px;
   color: rgba(169, 70, 47, .13);
@@ -1174,6 +1225,10 @@ body[data-categories-page] .page-hero {
 body[data-category-page] .page-hero {
   --page-hero-image: url("page-hero-category-list.jpg");
   background-position: center, 66% center;
+}
+
+body[data-category-page] .page-hero.has-category-cover {
+  background-position: center, center 36%;
 }
 
 body[data-search-page] .page-hero {

@@ -1175,19 +1175,27 @@
   function apiDirectoryCardMarkup(item, index) {
     const visibleLimit = item.kind === "exhibition" ? item.links.length : 3;
     const hiddenCount = Math.max(0, item.links.length - visibleLimit);
+    const primaryHref = item.links[0]?.href || "#";
+    const coverUrl = normalizeUrl(item.coverUrl);
     const links = item.links.map((link, linkIndex) => {
       const extra = linkIndex >= visibleLimit ? " is-extra" : "";
       return '<a class="sub-link' + extra + '" href="' + escapeHtml(link.href) + '">' + escapeHtml(link.name) + ' <span>' + escapeHtml(link.code || "") + '</span></a>';
     }).join("");
-    return '<article class="directory-card" data-index="' + String(index + 1).padStart(2, "0") + '">' +
-      '<div><p class="small">分类入口</p><h3><a class="directory-title-link" href="' + escapeHtml(item.links[0]?.href || "#") + '">' + escapeHtml(item.title) + '</a></h3><p class="muted">' + escapeHtml(item.desc || "后台分类已接入，可在后台新增和调整作品。") + '</p></div>' +
+    const cover = coverUrl
+      ? '<a class="directory-cover-link" href="' + escapeHtml(primaryHref) + '" aria-label="查看' + escapeHtml(item.title) + '"><img class="directory-cover" src="' + escapeHtml(coverUrl) + '" alt="" loading="lazy" decoding="async"></a>'
+      : "";
+    return '<article class="directory-card' + (coverUrl ? " has-cover" : "") + '" data-index="' + String(index + 1).padStart(2, "0") + '">' +
+      cover +
+      '<div><p class="small">分类入口</p><h3><a class="directory-title-link" href="' + escapeHtml(primaryHref) + '">' + escapeHtml(item.title) + '</a></h3><p class="muted">' + escapeHtml(item.desc || "后台分类已接入，可在后台新增和调整作品。") + '</p></div>' +
       '<div class="sub-links">' + links + (hiddenCount ? '<div class="sub-more-row"><button class="sub-more-button" type="button" data-sub-toggle aria-expanded="false">展开更多 ' + hiddenCount + '</button></div>' : "") + '</div>' +
     '</article>';
   }
 
   function apiCompactDirectoryCardMarkup(item, index) {
     const primary = item.links[0];
-    return '<a class="quick-category-card" href="' + escapeHtml(primary?.href || "#") + '">' +
+    const coverUrl = normalizeUrl(item.coverUrl);
+    return '<a class="quick-category-card' + (coverUrl ? " has-cover" : "") + '" href="' + escapeHtml(primary?.href || "#") + '">' +
+      (coverUrl ? '<img class="quick-category-cover" src="' + escapeHtml(coverUrl) + '" alt="" loading="lazy" decoding="async">' : "") +
       '<span class="quick-category-index">' + String(index + 1).padStart(2, "0") + '</span>' +
       '<strong>' + escapeHtml(item.title) + '</strong>' +
       '<small>' + escapeHtml(item.links.map((link) => link.name).slice(0, 3).join(" / ") || "后台分类入口") + '</small>' +
@@ -1222,6 +1230,7 @@
         title: parent.name || "作品分类",
         desc: parent.comment || "后台分类已接入，可在后台新增和调整作品。",
         kind: parent.kind || "catalog",
+        coverUrl: parent.tn_url || "",
         links: linkItems.map((category) => {
           const isParentDirect = Number(category.id) === Number(parent.id);
           return {
@@ -1455,7 +1464,8 @@
       parentName: caaBoard ? (caaRoot?.name || "中美协展览专项画稿") : (data.parent || parentApi?.name || apiCategory?.name || "作品分类"),
       name: caaBoard ? (caaChild ? (apiCategory?.name || data.name) : "全部作品") : (data.direct ? "全部作品" : (data.name || apiCategory?.name || "作品")),
       title: caaBoard ? (caaChild ? (apiCategory?.name || data.title) : (caaRoot?.name || "中美协展览专项画稿")) : (data.title || apiCategory?.name || "作品分类"),
-      desc: apiCategory?.comment || data.desc || "后台分类作品。"
+      desc: apiCategory?.comment || data.desc || "后台分类作品。",
+      coverUrl: apiCategory?.tn_url || ""
     };
   }
 
@@ -1530,6 +1540,11 @@
     document.querySelectorAll("[data-category-name]").forEach((node) => { node.textContent = context.name; });
     document.querySelectorAll("[data-category-title]").forEach((node) => { node.textContent = context.title; });
     document.querySelectorAll("[data-category-desc]").forEach((node) => { node.textContent = context.desc; });
+    const pageHero = document.querySelector("body[data-category-page] .page-hero");
+    if (pageHero && context.coverUrl) {
+      pageHero.style.setProperty("--page-hero-image", 'url("' + cleanCssUrl(normalizeUrl(context.coverUrl)) + '")');
+      pageHero.classList.add("has-category-cover");
+    }
 
     if (filterRow) {
       filterRow.hidden = true;

@@ -455,11 +455,28 @@ if ('set_cover' === $action)
   if (gzca_set_category_cover($album_id, $image_id))
   {
     invalidate_user_cache();
-    $page['infos'][] = '分类封面已更新。';
+    $cover_category = htmlspecialchars(gzca_category_path($album_id), ENT_QUOTES, 'UTF-8');
+    $page['infos'][] = '已设为“'.$cover_category.'”板块封面。该板块页面顶部会立即使用此图；父级板块封面还会显示在前台分类入口卡片。作品下架或设为私密时，前台会暂时隐藏封面。';
   }
   else
   {
     $page['errors'][] = '设置封面失败，该作品不属于所选分类。';
+  }
+}
+
+if ('unset_cover' === $action)
+{
+  $image_id = isset($_POST['image_id']) ? (int)$_POST['image_id'] : 0;
+  $album_id = isset($_POST['album_id']) ? (int)$_POST['album_id'] : 0;
+  if (gzca_unset_category_cover($album_id, $image_id))
+  {
+    invalidate_user_cache();
+    $cover_category = htmlspecialchars(gzca_category_path($album_id), ENT_QUOTES, 'UTF-8');
+    $page['infos'][] = '“'.$cover_category.'”分类封面已下架，作品本身没有删除或下架。';
+  }
+  else
+  {
+    $page['errors'][] = '下架封面失败：该作品已经不是这个板块的当前封面，请刷新页面后重试。';
   }
 }
 
@@ -762,7 +779,8 @@ SELECT
     gw.sort_order,
     gw.download_count,
     ic.category_id,
-    c.name AS category_name
+    c.name AS category_name,
+    c.representative_picture_id AS category_cover_image_id
   FROM '.IMAGES_TABLE.' AS i
     LEFT JOIN '.GZCA_WORKS_TABLE.' AS gw ON gw.image_id = i.id
     LEFT JOIN '.IMAGE_CATEGORY_TABLE.' AS ic ON ic.image_id = i.id
@@ -848,7 +866,8 @@ SELECT
     gw.sort_order,
     gw.download_count,
     ic.category_id,
-    c.name AS category_name
+    c.name AS category_name,
+    c.representative_picture_id AS category_cover_image_id
   FROM '.IMAGES_TABLE.' AS i
     LEFT JOIN '.GZCA_WORKS_TABLE.' AS gw ON gw.image_id = i.id
     LEFT JOIN '.IMAGE_CATEGORY_TABLE.' AS ic ON ic.image_id = i.id

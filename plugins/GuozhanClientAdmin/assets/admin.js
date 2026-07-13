@@ -375,6 +375,18 @@
             tone: "normal"
           }] };
         }
+        else if (action.value === "unset_cover") {
+          var coverTitle = button ? (button.getAttribute("title") || "") : "";
+          var coverCategory = coverTitle.replace(/^下架\s*/, "").replace(/\s*的封面.*$/, "") || "这个板块";
+          options = { steps: [{
+            eyebrow: "封面下架",
+            title: "下架「" + coverCategory + "」的当前封面？",
+            body: "确认后，该板块前台会恢复默认背景或无封面状态。",
+            detail: "作品本身仍保持原来的上架、公开和分类状态，不会删除图片；之后可以重新设置封面。",
+            confirmLabel: "确认下架封面",
+            tone: "normal"
+          }] };
+        }
         else if (action.value === "hide_category" || action.value === "show_category") {
           var categoryName = form.getAttribute("data-category-name") || "这个板块";
           var isHiding = action.value === "hide_category";
