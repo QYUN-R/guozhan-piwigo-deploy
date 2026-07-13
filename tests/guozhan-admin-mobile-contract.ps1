@@ -49,6 +49,11 @@ if ($style -notmatch '@media\s*\(max-width:\s*820px\)[\s\S]*?\.gzca-account-page
     $failures.Add('Account-security actions still override the shared 44px mobile touch target.')
 }
 
+if ($style -notmatch '@media\s*\(max-width:\s*820px\)[\s\S]*?\.gzca-page-header-account\s+\.gzca-header-actions\s*\{[^}]*width:\s*100%' -or
+    $style -notmatch '@media\s*\(max-width:\s*420px\)[\s\S]*?\.gzca-page-header-account\s+\.gzca-header-actions\s+\.gzca-logout-button\s*\{[^}]*grid-column:\s*1\s*/\s*-1') {
+    $failures.Add('The mobile account header actions are not full-width with a dedicated logout row.')
+}
+
 if ($style -notmatch '@media\s*\(max-width:\s*820px\)[\s\S]*?\.gzca-dropzone\s*\{[\s\S]*?min-height:\s*240px') {
     $failures.Add('The mobile upload drop zone still consumes too much of the first screen.')
 }

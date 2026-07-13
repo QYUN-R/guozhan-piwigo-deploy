@@ -3668,6 +3668,19 @@ body#theAdminPage .gzca-account-page .gzca-security-alert span {
     display: none;
   }
 
+  .gzca-page-header-account > div:first-child,
+  .gzca-page-header-account h2 {
+    text-align: left;
+  }
+
+  .gzca-page-header-account h2 {
+    font-size: 28px;
+  }
+
+  .gzca-page-header-account .gzca-header-actions {
+    width: 100%;
+  }
+
   .gzca-header-actions .gzca-button,
   .gzca-page-header-account .gzca-header-actions .gzca-button,
   .gzca-page-header-account .gzca-logout-button {
@@ -3821,6 +3834,10 @@ body#theAdminPage .gzca-account-page .gzca-security-alert span {
   }
 
   .gzca-header-actions .gzca-logout-button {
+    grid-column: 1 / -1;
+  }
+
+  .gzca-page-header-account .gzca-header-actions .gzca-logout-button {
     grid-column: 1 / -1;
   }
 
