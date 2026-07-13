@@ -3689,6 +3689,12 @@ body#theAdminPage .gzca-account-page .gzca-security-alert span {
     padding: 10px 12px;
   }
 
+  .gzca-account-page .gzca-security-form .gzca-button,
+  .gzca-account-page .gzca-security-device-form > .gzca-button {
+    min-height: 44px;
+    font-size: 14px;
+  }
+
   .gzca-panel {
     padding: 15px;
   }

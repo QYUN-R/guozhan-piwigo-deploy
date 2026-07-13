@@ -38,7 +38,28 @@
       <div>
         {if $GZCA_TAB eq 'dashboard'}<p>内容总览</p><h2>工作台</h2>{/if}
         {if $GZCA_TAB eq 'home'}<p>首页视觉与轮播壁纸</p><h2>首页轮播</h2>{/if}
-        {if $GZCA_TAB eq 'home'}
+        {if $GZCA_TAB eq 'upload'}<p>添加图库内容</p><h2>上传作品</h2>{/if}
+        {if $GZCA_TAB eq 'works'}<p>编号、封面与上下架</p><h2>作品管理</h2>{/if}
+        {if $GZCA_TAB eq 'categories'}<p>主分类与小分类</p><h2>分类管理</h2>{/if}
+        {if $GZCA_TAB eq 'contact'}<p>同步前台 Logo 与联系方式</p><h2>品牌与客服</h2>{/if}
+        {if $GZCA_TAB eq 'security'}<p>管理员资料与安全设置</p><h2>个人中心</h2>{/if}
+      </div>
+      <div class="gzca-header-actions">
+        <a class="gzca-admin-session" href="{$GZCA_URLS.security|escape:'html'}" aria-label="查看管理员账号信息" {if $GZCA_TAB eq 'security'}aria-current="page"{/if}>
+          <span class="gzca-admin-session-mark">管</span>
+          <span class="gzca-admin-session-copy">
+            <small>当前{$GZCA_ADMIN_IDENTITY.role|escape:'html'}</small>
+            <strong>{$GZCA_ADMIN_IDENTITY.username|escape:'html'}</strong>
+            <em>登录有效至 {$GZCA_ADMIN_IDENTITY.expires_at|escape:'html'}</em>
+          </span>
+        </a>
+        <a class="gzca-button gzca-button-quiet" href="{$GZCA_URLS.gallery|escape:'html'}" target="_blank" rel="noopener">预览网站</a>
+        {if $GZCA_TAB neq 'upload'}<a class="gzca-button gzca-button-primary" href="{$GZCA_URLS.upload|escape:'html'}">上传作品</a>{/if}
+        <a class="gzca-button gzca-button-danger gzca-logout-button" href="{$GZCA_URLS.logout|escape:'html'}">退出登录</a>
+      </div>
+    </header>
+
+    {if $GZCA_TAB eq 'home'}
       <form class="gzca-home-hero-layout" action="{$GZCA_URLS.home|escape:'html'}" method="post" enctype="multipart/form-data">
         <input type="hidden" name="pwg_token" value="{$GZCA_TOKEN|escape:'html'}"><input type="hidden" name="gzca_action" value="save_home_hero">
         <section class="gzca-panel">
@@ -72,27 +93,6 @@
         </aside>
       </form>
     {/if}
-
-    {if $GZCA_TAB eq 'upload'}<p>添加图库内容</p><h2>上传作品</h2>{/if}
-        {if $GZCA_TAB eq 'works'}<p>编号、封面与上下架</p><h2>作品管理</h2>{/if}
-        {if $GZCA_TAB eq 'categories'}<p>主分类与小分类</p><h2>分类管理</h2>{/if}
-        {if $GZCA_TAB eq 'contact'}<p>同步前台 Logo 与联系方式</p><h2>品牌与客服</h2>{/if}
-        {if $GZCA_TAB eq 'security'}<p>管理员资料与安全设置</p><h2>个人中心</h2>{/if}
-      </div>
-      <div class="gzca-header-actions">
-        <a class="gzca-admin-session" href="{$GZCA_URLS.security|escape:'html'}" aria-label="查看管理员账号信息" {if $GZCA_TAB eq 'security'}aria-current="page"{/if}>
-          <span class="gzca-admin-session-mark">管</span>
-          <span class="gzca-admin-session-copy">
-            <small>当前{$GZCA_ADMIN_IDENTITY.role|escape:'html'}</small>
-            <strong>{$GZCA_ADMIN_IDENTITY.username|escape:'html'}</strong>
-            <em>登录有效至 {$GZCA_ADMIN_IDENTITY.expires_at|escape:'html'}</em>
-          </span>
-        </a>
-        <a class="gzca-button gzca-button-quiet" href="{$GZCA_URLS.gallery|escape:'html'}" target="_blank" rel="noopener">预览网站</a>
-        {if $GZCA_TAB neq 'upload'}<a class="gzca-button gzca-button-primary" href="{$GZCA_URLS.upload|escape:'html'}">上传作品</a>{/if}
-        <a class="gzca-button gzca-button-danger gzca-logout-button" href="{$GZCA_URLS.logout|escape:'html'}">退出登录</a>
-      </div>
-    </header>
 
     {if $GZCA_TAB eq 'dashboard'}
       <form class="gzca-setup-bar" action="{$GZCA_URLS.dashboard|escape:'html'}" method="post">

@@ -16,6 +16,10 @@ if ($template -notmatch 'gzca-category-layout\s+\{if\s+\$GZCA_EDIT_CATEGORY\}is-
     $failures.Add('Category management does not expose editing state for mobile content ordering.')
 }
 
+if ($template -notmatch '</header>\s*\{if\s+\$GZCA_TAB\s+eq\s+''home''\}\s*<form\s+class="gzca-home-hero-layout"') {
+    $failures.Add('The home carousel form is still nested inside the page header and pushes mobile actions below the first screen.')
+}
+
 if ($script -notmatch 'function\s+initMobileNavigation\s*\(' -or
     $script -notmatch 'is-mobile-nav-open' -or
     $script -notmatch 'aria-expanded' -or
@@ -39,6 +43,10 @@ if ($style -notmatch '@media\s*\(max-width:\s*820px\)[\s\S]*?\.gzca-shell\s+inpu
 if ($style -notmatch '@media\s*\(max-width:\s*820px\)[\s\S]*?\.gzca-button[\s\S]*?min-height:\s*44px' -or
     $style -notmatch '@media\s*\(max-width:\s*820px\)[\s\S]*?\.gzca-work-table\s+\.gzca-row-actions\s+(a|button)[\s\S]*?min-height:\s*44px') {
     $failures.Add('Primary and work-management actions do not meet the 44px mobile touch target.')
+}
+
+if ($style -notmatch '@media\s*\(max-width:\s*820px\)[\s\S]*?\.gzca-account-page\s+\.gzca-security-form\s+\.gzca-button[\s\S]*?min-height:\s*44px') {
+    $failures.Add('Account-security actions still override the shared 44px mobile touch target.')
 }
 
 if ($style -notmatch '@media\s*\(max-width:\s*820px\)[\s\S]*?\.gzca-dropzone\s*\{[\s\S]*?min-height:\s*240px') {
