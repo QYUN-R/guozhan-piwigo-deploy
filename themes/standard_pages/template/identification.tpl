@@ -43,8 +43,14 @@
       <div class="guozhan-login-panel-head">
         <p>Sign in</p>
         <h2>{'Login'|translate|escape:'html'}</h2>
-        <span>使用管理员账号进入国展客户后台。</span>
+        <span>仅允许已授权管理员登录，登录状态最多保留 7 天。</span>
       </div>
+
+{if isset($GZCA_AUTH_NOTICE) and $GZCA_AUTH_NOTICE}
+      <div class="guozhan-login-alert" role="status">
+        <p>{$GZCA_AUTH_NOTICE|escape:'html'}</p>
+      </div>
+{/if}
 
 {if isset($errors['login_page_error'])}
       <div class="guozhan-login-alert" role="alert">
@@ -78,9 +84,9 @@
         <div class="column-flex guozhan-login-remember">
           <div class="row-flex remember-me-container">
             <label for="remember_me">
-              <input tabindex="3" type="checkbox" name="remember_me" id="remember_me" value="1">
+              <input tabindex="3" type="checkbox" name="remember_me" id="remember_me" value="1" checked>
               <span class="gallery-icon-checkmark"></span>
-              {'Auto login'|@translate|escape:'html'}
+              保持登录 7 天
             </label>
           </div>
         </div>

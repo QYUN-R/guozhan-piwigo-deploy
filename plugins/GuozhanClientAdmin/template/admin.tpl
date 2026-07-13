@@ -72,8 +72,17 @@
         {if $GZCA_TAB eq 'contact'}<p>同步前台 Logo 与联系方式</p><h2>品牌与客服</h2>{/if}
       </div>
       <div class="gzca-header-actions">
+        <div class="gzca-admin-session" aria-label="当前管理员身份">
+          <span class="gzca-admin-session-mark">管</span>
+          <span class="gzca-admin-session-copy">
+            <small>当前{$GZCA_ADMIN_IDENTITY.role|escape:'html'}</small>
+            <strong>{$GZCA_ADMIN_IDENTITY.username|escape:'html'}</strong>
+            <em>登录有效至 {$GZCA_ADMIN_IDENTITY.expires_at|escape:'html'}</em>
+          </span>
+        </div>
         <a class="gzca-button gzca-button-quiet" href="{$GZCA_URLS.gallery|escape:'html'}" target="_blank" rel="noopener">预览网站</a>
         {if $GZCA_TAB neq 'upload'}<a class="gzca-button gzca-button-primary" href="{$GZCA_URLS.upload|escape:'html'}">上传作品</a>{/if}
+        <a class="gzca-button gzca-button-danger gzca-logout-button" href="{$GZCA_URLS.logout|escape:'html'}">退出登录</a>
       </div>
     </header>
 

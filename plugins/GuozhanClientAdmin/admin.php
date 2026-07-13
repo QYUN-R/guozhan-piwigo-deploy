@@ -807,6 +807,7 @@ $template->assign(array(
   'GZCA_TOKEN' => get_pwg_token(),
   'GZCA_IS_WEBMASTER' => is_webmaster(),
   'GZCA_IS_CUSTOMER_ADMIN' => gzca_is_customer_admin(),
+  'GZCA_ADMIN_IDENTITY' => gzca_admin_identity(),
   'GZCA_STATS' => $stats,
   'GZCA_DATABASE_HEALTH' => $database_health,
   'GZCA_SAMPLE_WORKS_STATUS' => $sample_works_status,
@@ -835,6 +836,7 @@ $template->assign(array(
     'categories' => gzca_admin_url('categories'),
     'contact' => gzca_admin_url('contact'),
     'gallery' => get_gallery_home_url(),
+    'logout' => get_root_url().'index.php?act=logout',
     ),
   ));
 

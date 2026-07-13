@@ -42,6 +42,7 @@ function gzca_init()
 
   $conf['gzca_config'] = array_merge(gzca_default_config(), $conf['gzca_config']);
   $conf['gzca_config']['restrict_administrators'] = true;
+  $conf['gzca_config']['admin_login_whitelist_enabled'] = true;
 }
 
 function gzca_config()
@@ -170,10 +171,12 @@ function gzca_is_customer_admin()
 
 function gzca_restrict_customer_admin()
 {
-  if (!gzca_is_customer_admin())
+  if (is_a_guest())
   {
     return;
   }
+
+  gzca_validate_admin_session();
 
   $page = isset($_GET['page']) ? $_GET['page'] : '';
   $section = isset($_GET['section']) ? $_GET['section'] : '';
@@ -209,24 +212,181 @@ function gzca_admin_login_whitelist()
   return array_unique($items);
 }
 
-function gzca_finalize_login_whitelist($state, $user_found, $remember_me)
+function gzca_admin_account_is_allowed($account)
 {
-  $config = gzca_config();
-  if (empty($config['admin_login_whitelist_enabled']))
+  $username = isset($account['username']) ? strtolower(trim((string)$account['username'])) : '';
+  $status = isset($account['status']) ? (string)$account['status'] : '';
+
+  return in_array($status, array('admin', 'webmaster'), true)
+    && in_array($username, gzca_admin_login_whitelist(), true);
+}
+
+function gzca_remember_cookie_session($user_id)
+{
+  global $conf;
+
+  if (empty($_COOKIE[$conf['remember_me_name']]))
   {
-    return $state;
+    return null;
   }
 
-  $username = isset($user_found['username']) ? strtolower(trim((string)$user_found['username'])) : '';
-  $status = isset($user_found['status']) ? (string)$user_found['status'] : '';
-  $allowed_status = in_array($status, array('admin', 'webmaster'), true);
-  $allowed_user = in_array($username, gzca_admin_login_whitelist(), true);
+  $raw_cookie = stripslashes((string)$_COOKIE[$conf['remember_me_name']]);
+  $cookie = explode('-', $raw_cookie);
+  if (3 !== count($cookie) || !is_numeric($cookie[0]) || !is_numeric($cookie[1]))
+  {
+    return null;
+  }
 
-  if (!$allowed_status || !$allowed_user)
+  $issued_at = (int)$cookie[1];
+  if ((int)$cookie[0] !== (int)$user_id
+      || $issued_at <= 0
+      || $issued_at > time()
+      || $issued_at + GZCA_ADMIN_SESSION_TTL < time())
+  {
+    return null;
+  }
+
+  return array(
+    'value' => $raw_cookie,
+    'issued_at' => $issued_at,
+    );
+}
+
+function gzca_record_admin_session($user_id)
+{
+  global $conf;
+
+  $user_id = (int)$user_id;
+  $account = getuserdata($user_id, false);
+  $account['id'] = $user_id;
+  if (!gzca_admin_account_is_allowed($account))
+  {
+    unset($_SESSION['gzca_admin_user_id'], $_SESSION['gzca_admin_issued_at']);
+    return;
+  }
+
+  $manual_issue = isset($GLOBALS['gzca_manual_login_issued_at'])
+    ? (int)$GLOBALS['gzca_manual_login_issued_at']
+    : 0;
+  $remember_session = 0 === $manual_issue ? gzca_remember_cookie_session($user_id) : null;
+  $issued_at = $manual_issue > 0
+    ? $manual_issue
+    : ($remember_session ? (int)$remember_session['issued_at'] : time());
+
+  $_SESSION['gzca_admin_user_id'] = $user_id;
+  $_SESSION['gzca_admin_issued_at'] = $issued_at;
+
+  if ($remember_session)
+  {
+    // Core auto-login rotates the cookie timestamp. Restore the original value
+    // so the seven-day administrator lifetime cannot silently roll forward.
+    setcookie(
+      $conf['remember_me_name'],
+      $remember_session['value'],
+      $issued_at + GZCA_ADMIN_SESSION_TTL,
+      cookie_path(),
+      ini_get('session.cookie_domain'),
+      ini_get('session.cookie_secure'),
+      ini_get('session.cookie_httponly')
+      );
+  }
+}
+
+function gzca_admin_login_url($reason)
+{
+  $redirect_to = cookie_path().'admin.php?page=plugin-'.GZCA_ID.'&tab=dashboard';
+  return get_root_url().'identification.php?'.http_build_query(
+    array(
+      'redirect' => $redirect_to,
+      'hide_redirect_error' => 1,
+      'gzca_auth' => $reason,
+      ),
+    '',
+    '&'
+    );
+}
+
+function gzca_force_admin_reauthentication($reason)
+{
+  logout_user();
+  redirect(gzca_admin_login_url($reason));
+}
+
+function gzca_validate_admin_session()
+{
+  global $user;
+
+  if (!gzca_admin_account_is_allowed($user))
+  {
+    gzca_force_admin_reauthentication('unauthorized');
+  }
+
+  $session_user_id = isset($_SESSION['gzca_admin_user_id'])
+    ? (int)$_SESSION['gzca_admin_user_id']
+    : 0;
+  $issued_at = isset($_SESSION['gzca_admin_issued_at'])
+    ? (int)$_SESSION['gzca_admin_issued_at']
+    : 0;
+
+  if ($session_user_id <= 0 || $issued_at <= 0 || $session_user_id !== (int)$user['id'])
+  {
+    gzca_force_admin_reauthentication('reauth');
+  }
+
+  if ($issued_at > time() || $issued_at + GZCA_ADMIN_SESSION_TTL <= time())
+  {
+    gzca_force_admin_reauthentication('expired');
+  }
+
+  return true;
+}
+
+function gzca_admin_identity()
+{
+  global $user;
+
+  $issued_at = (int)$_SESSION['gzca_admin_issued_at'];
+  $expires_at = $issued_at + GZCA_ADMIN_SESSION_TTL;
+
+  return array(
+    'id' => (int)$user['id'],
+    'username' => (string)$user['username'],
+    'role' => 'webmaster' === $user['status'] ? '站点管理员' : '管理员',
+    'issued_at' => date('Y-m-d H:i', $issued_at),
+    'expires_at' => date('Y-m-d H:i', $expires_at),
+    );
+}
+
+function gzca_prepare_login_notice()
+{
+  global $template;
+
+  $reason = isset($_GET['gzca_auth']) ? (string)$_GET['gzca_auth'] : '';
+  $messages = array(
+    'reauth' => '后台安全策略已更新，请重新验证管理员身份。',
+    'expired' => '管理员登录状态已超过 7 天，请重新输入账号和密码。',
+    'unauthorized' => '当前账号没有后台权限，请使用已授权管理员账号登录。',
+    );
+
+  if (isset($messages[$reason]))
+  {
+    $template->assign('GZCA_AUTH_NOTICE', $messages[$reason]);
+  }
+}
+
+function gzca_finalize_login_whitelist($state, $user_found, $remember_me)
+{
+  if (!gzca_admin_account_is_allowed($user_found))
   {
     $state['can_login'] = false;
     $state['reason'] = 'gzca_login_not_whitelisted';
+    return $state;
   }
+
+  $GLOBALS['gzca_manual_login_issued_at'] = time();
+  log_user((int)$user_found['id'], true);
+  unset($GLOBALS['gzca_manual_login_issued_at']);
+  $state['authenticated'] = true;
 
   return $state;
 }

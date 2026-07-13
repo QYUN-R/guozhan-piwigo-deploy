@@ -6,7 +6,7 @@ This is a complete Piwigo 16.4.0 test project with:
 
 - Static customer frontend: `index.html`, `screens/` and `assets/`
 - Frontend theme: `themes/guozhan-gallery`
-- Admin plugin: `plugins/GuozhanClientAdmin` (`0.6.1`)
+- Admin plugin: `plugins/GuozhanClientAdmin` (`0.6.2`)
 - Piwigo core files, default themes and default plugins
 
 ## Active Web Root Layout

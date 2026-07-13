@@ -248,6 +248,57 @@ body#theAdminPage .eiw .errors {
   gap: 9px;
 }
 
+.gzca-header-actions {
+  justify-content: flex-end;
+}
+
+.gzca-admin-session {
+  min-width: 210px;
+  display: grid;
+  grid-template-columns: 36px minmax(0, 1fr);
+  align-items: center;
+  gap: 10px;
+  border: 1px solid var(--gzca-line);
+  border-radius: 6px;
+  background: var(--gzca-surface);
+  padding: 7px 10px;
+}
+
+.gzca-admin-session-mark {
+  width: 36px;
+  height: 36px;
+  display: grid;
+  place-items: center;
+  border-radius: 50%;
+  background: var(--gzca-ink);
+  color: #fff;
+  font-size: 12px;
+  font-weight: 800;
+}
+
+.gzca-admin-session-copy {
+  min-width: 0;
+  display: grid;
+  gap: 1px;
+}
+
+.gzca-admin-session-copy small,
+.gzca-admin-session-copy em {
+  color: var(--gzca-muted);
+  font-size: 10px;
+  font-style: normal;
+  line-height: 1.35;
+}
+
+.gzca-admin-session-copy strong {
+  overflow: hidden;
+  color: var(--gzca-ink);
+  font-size: 13px;
+  line-height: 1.35;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
 .gzca-button {
   min-height: 40px;
   display: inline-flex;
@@ -1417,6 +1468,15 @@ body#theAdminPage .eiw .errors {
   .gzca-header-actions,
   .gzca-header-actions .gzca-button {
     width: 100%;
+  }
+
+  .gzca-admin-session {
+    width: 100%;
+    min-width: 0;
+  }
+
+  .gzca-logout-button {
+    order: 4;
   }
 
   .gzca-setup-bar {

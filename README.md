@@ -4,7 +4,7 @@ This repository contains the current Guozhan gallery deployment package:
 
 - Static customer frontend: `index.html`, `screens/`, and `assets/`
 - Piwigo 16.4.0 backend and WebService API
-- Custom admin plugin: `plugins/GuozhanClientAdmin` version `0.6.1`
+- Custom admin plugin: `plugins/GuozhanClientAdmin` version `0.6.2`
 - Sequential artwork upload batches of 20, 30, 40, or 50 images (20 by default)
 
 The production-style container layout serves this checkout from `/config/www`.
