@@ -3433,3 +3433,26 @@ body#theAdminPage .gzca-page-header-account h2 {
     width: 100%;
   }
 }
+
+body#theAdminPage .gzca-sidebar-footer small {
+  color: #aeb3ad;
+}
+
+body#theAdminPage .gzca-account-logout {
+  color: #8a3426;
+}
+
+body#theAdminPage .gzca-email-current small,
+body#theAdminPage .gzca-email-current span,
+body#theAdminPage .gzca-security-device-copy span,
+body#theAdminPage .gzca-security-locked span {
+  color: #59625e;
+}
+
+body#theAdminPage .gzca-account-page .gzca-security-alert strong {
+  color: #68501e;
+}
+
+body#theAdminPage .gzca-account-page .gzca-security-alert span {
+  color: #5f5e57;
+}
