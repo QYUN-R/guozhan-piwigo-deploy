@@ -141,12 +141,8 @@ if ($admin -notmatch 'gzca_admin_email_security_status\s*\(' -or
     $admin -notmatch "GZCA_EMAIL_SECURITY") {
     $failures.Add('The account-security page is not given current verification and mail-delivery state.')
 }
-if ($admin -notmatch "redirect\s*\(\s*gzca_admin_url\('security'" -or
-    $admin -notmatch 'requires_binding') {
-    $failures.Add('An unverified customer administrator is not guided to first-login email binding.')
-}
-if ($admin -notmatch 'requires_binding[\s\S]{0,180}mail_status\[''ready''\][\s\S]{0,180}''security''\s*!==\s*\$tab') {
-    $failures.Add('First-login binding can lock the customer out before the private SMTP sender is ready.')
+if ($admin -match 'requires_binding[\s\S]{0,220}redirect\s*\(\s*gzca_admin_url\(''security''') {
+    $failures.Add('Recovery-email setup blocks the rest of the administrator workspace instead of remaining a non-blocking reminder.')
 }
 if ($template -notmatch '账号中心' -or
     $template -notmatch 'gzca-account-summary' -or

@@ -2,6 +2,9 @@ $ErrorActionPreference = 'Stop'
 
 $root = Split-Path -Parent $PSScriptRoot
 $template = Get-Content -Raw (Join-Path $root 'themes\standard_pages\template\identification.tpl')
+$standardHeader = Get-Content -Raw (Join-Path $root 'themes\standard_pages\template\header.tpl')
+$galleryHeader = Get-Content -Raw (Join-Path $root 'themes\guozhan-gallery\template\header.tpl')
+$admin = Get-Content -Raw (Join-Path $root 'plugins\GuozhanClientAdmin\admin.php')
 $style = Get-Content -Raw (Join-Path $root 'themes\standard_pages\guozhan-login.css')
 $failures = [System.Collections.Generic.List[string]]::new()
 
@@ -13,6 +16,11 @@ if ($template -notmatch 'color-scheme" content="light') {
 }
 if ($template -match '比赛' -or $template -notmatch '首页轮播') {
     $failures.Add('The login copy does not match the current website management sections.')
+}
+if ($standardHeader -notmatch 'themes/guozhan-gallery/assets/logo-mark\.png' -or
+    $galleryHeader -notmatch 'themes/guozhan-gallery/assets/logo-mark\.png' -or
+    $admin -notmatch 'themes/guozhan-gallery/assets/logo-mark\.png') {
+    $failures.Add('Public, login, and administrator pages do not consistently use the Guozhan logo as the browser icon.')
 }
 if ($style -notmatch 'color-scheme:\s*light') {
     $failures.Add('The customized login surface is not fixed to the website light color system.')

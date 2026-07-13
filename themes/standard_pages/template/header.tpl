@@ -9,7 +9,7 @@
 <meta name="viewport" content="width=device-width, initial-scale=1">
 
 <title>{if $PAGE_TITLE!=l10n('Home') && $PAGE_TITLE!=$GALLERY_TITLE}{$PAGE_TITLE} | {/if}{$GALLERY_TITLE}</title>
-<link rel="shortcut icon" type="image/x-icon" href="{$ROOT_URL}{$themeconf.icon_dir}/favicon.ico">
+<link rel="icon" type="image/png" href="{$ROOT_URL}themes/guozhan-gallery/assets/logo-mark.png?v=20260714-favicon-1">
 
 {strip}
 {foreach from=$themes item=theme}
