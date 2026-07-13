@@ -6,6 +6,42 @@
     return (bytes / 1024 / 1024).toFixed(1) + " MB";
   }
 
+  function initMobileNavigation() {
+    var sidebar = document.querySelector(".gzca-sidebar");
+    var toggle = document.querySelector("[data-mobile-nav-toggle]");
+    var nav = document.querySelector("[data-mobile-nav]");
+    if (!sidebar || !toggle || !nav) return;
+
+    function setOpen(open) {
+      sidebar.classList.toggle("is-mobile-nav-open", open);
+      toggle.setAttribute("aria-expanded", open ? "true" : "false");
+      toggle.setAttribute("aria-label", open ? "收起后台菜单" : "展开后台菜单");
+    }
+
+    toggle.addEventListener("click", function () {
+      setOpen(!sidebar.classList.contains("is-mobile-nav-open"));
+    });
+
+    nav.addEventListener("click", function (event) {
+      if (event.target.closest("a")) setOpen(false);
+    });
+
+    document.addEventListener("keydown", function (event) {
+      if (event.key === "Escape") setOpen(false);
+    });
+
+    if (window.matchMedia) {
+      var desktop = window.matchMedia("(min-width: 821px)");
+      var resetForDesktop = function (event) {
+        if (event.matches) setOpen(false);
+      };
+      if (typeof desktop.addEventListener === "function") desktop.addEventListener("change", resetForDesktop);
+      else if (typeof desktop.addListener === "function") desktop.addListener(resetForDesktop);
+    }
+
+    setOpen(false);
+  }
+
   function selectedUploadBatchSize(control) {
     var value = parseInt(control && control.value, 10);
     return [20, 30, 40, 50].indexOf(value) !== -1 ? value : 20;
@@ -685,6 +721,7 @@
   }
 
   document.addEventListener("DOMContentLoaded", function () {
+    initMobileNavigation();
     initUpload();
     initBulkWorks();
     initConfirmations();

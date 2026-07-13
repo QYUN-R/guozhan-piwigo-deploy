@@ -6,12 +6,18 @@
 
 <div class="gzca-shell" data-gzca-tab="{$GZCA_TAB|escape:'html'}">
   <aside class="gzca-sidebar">
-    <a class="gzca-brand" href="{$GZCA_URLS.dashboard|escape:'html'}">
-      <span class="gzca-brand-mark">图</span>
-      <span><strong>图物计划</strong><small>国展素材馆后台</small></span>
-    </a>
+    <div class="gzca-sidebar-head">
+      <a class="gzca-brand" href="{$GZCA_URLS.dashboard|escape:'html'}">
+        <span class="gzca-brand-mark">图</span>
+        <span><strong>图物计划</strong><small>国展素材馆后台</small></span>
+      </a>
+      <button class="gzca-mobile-nav-toggle" type="button" data-mobile-nav-toggle aria-expanded="false" aria-controls="gzca-mobile-nav">
+        <span class="gzca-mobile-nav-icon" aria-hidden="true"><i></i><i></i><i></i></span>
+        <span>菜单</span>
+      </button>
+    </div>
 
-    <nav class="gzca-nav" aria-label="客户后台导航">
+    <nav id="gzca-mobile-nav" class="gzca-nav" aria-label="客户后台导航" data-mobile-nav>
       <a href="{$GZCA_URLS.dashboard|escape:'html'}" class="{if $GZCA_TAB eq 'dashboard'}is-active{/if}"><span>概</span>工作台</a>
       <a href="{$GZCA_URLS.home|escape:'html'}" class="{if $GZCA_TAB eq 'home'}is-active{/if}"><span>首</span>首页轮播</a>
       <a href="{$GZCA_URLS.upload|escape:'html'}" class="{if $GZCA_TAB eq 'upload'}is-active{/if}"><span>传</span>上传作品</a>
@@ -292,7 +298,7 @@
     {/if}
 
     {if $GZCA_TAB eq 'categories'}
-      <div class="gzca-category-layout">
+      <div class="gzca-category-layout {if $GZCA_EDIT_CATEGORY}is-editing{/if}">
         <section class="gzca-panel gzca-category-form-panel">
           <div class="gzca-panel-head"><div><p>{if $GZCA_EDIT_CATEGORY}编辑分类{else}新增分类{/if}</p><h3>{if $GZCA_EDIT_CATEGORY}{$GZCA_EDIT_CATEGORY.name|escape:'html'}{else}建立相册层级{/if}</h3></div>{if $GZCA_EDIT_CATEGORY}<a class="gzca-text-link" href="{$GZCA_URLS.categories|escape:'html'}">取消编辑</a>{/if}</div>
           <form class="gzca-stack-form" action="{if $GZCA_EDIT_CATEGORY}{$GZCA_URLS.categories|escape:'html'}&amp;edit={$GZCA_EDIT_CATEGORY.id}{else}{$GZCA_URLS.categories|escape:'html'}{/if}" method="post" data-category-form>
