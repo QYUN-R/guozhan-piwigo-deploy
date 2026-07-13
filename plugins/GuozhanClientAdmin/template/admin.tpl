@@ -365,53 +365,56 @@
 
     {if $GZCA_TAB eq 'security'}
       <div class="gzca-account-page">
-        <section class="gzca-account-hero" aria-label="管理员账号资料">
+        <section class="gzca-account-summary" aria-label="管理员账号资料">
           <span class="gzca-account-avatar">管</span>
           <div class="gzca-account-copy">
-            <span>管理员账号</span>
+            <p>管理员账号</p>
             <h3>{$GZCA_ADMIN_IDENTITY.username|escape:'html'}</h3>
-            <div class="gzca-account-meta">
+            <div class="gzca-account-tags">
               <span>{$GZCA_ADMIN_IDENTITY.role|escape:'html'}</span>
-              <span>登录有效至 {$GZCA_ADMIN_IDENTITY.expires_at|escape:'html'}</span>
-              <span>{if $GZCA_EMAIL_SECURITY.verified}{$GZCA_EMAIL_SECURITY.masked_email|escape:'html'}{else}恢复邮箱未绑定{/if}</span>
+              <span class="is-online">当前设备已登录</span>
             </div>
           </div>
-          <div class="gzca-account-actions">
-            <span class="gzca-security-badge is-verified">当前设备已登录</span>
-            <a class="gzca-button gzca-button-danger" href="{$GZCA_URLS.logout|escape:'html'}">退出当前账号</a>
-          </div>
+          <dl class="gzca-account-facts">
+            <div><dt>登录有效至</dt><dd>{$GZCA_ADMIN_IDENTITY.expires_at|escape:'html'}</dd></div>
+            <div><dt>恢复邮箱</dt><dd class="{if !$GZCA_EMAIL_SECURITY.verified}is-empty{/if}">{if $GZCA_EMAIL_SECURITY.verified}{$GZCA_EMAIL_SECURITY.masked_email|escape:'html'}{else}尚未绑定{/if}</dd></div>
+          </dl>
+          <a class="gzca-button gzca-account-logout" href="{$GZCA_URLS.logout|escape:'html'}">退出当前账号</a>
         </section>
 
         <div class="gzca-security-layout">
           <section id="recovery-email" class="gzca-panel gzca-security-panel">
             <div class="gzca-panel-head">
-              <div><p>账号找回</p><h3>恢复邮箱</h3></div>
-              <span class="gzca-security-badge {if $GZCA_EMAIL_SECURITY.verified}is-verified{else}is-unverified{/if}">{if $GZCA_EMAIL_SECURITY.verified}已验证{else}待绑定{/if}</span>
+              <div><p>账号找回</p><h3>{if $GZCA_EMAIL_SECURITY.verified}恢复邮箱与换绑{else}绑定恢复邮箱{/if}</h3></div>
+              <span class="gzca-security-badge {if $GZCA_EMAIL_SECURITY.verified}is-verified{else}is-unverified{/if}">{if $GZCA_EMAIL_SECURITY.verified}已绑定{else}未绑定{/if}</span>
             </div>
 
-            <div class="gzca-security-overview">
-              <div class="gzca-security-status">
-                <span>当前状态</span>
+            <div class="gzca-email-overview">
+              <div class="gzca-email-current">
+                <span class="gzca-setting-icon">邮</span>
+                <div>
+                  <small>当前恢复邮箱</small>
                 {if $GZCA_EMAIL_SECURITY.verified}
                   <strong>{$GZCA_EMAIL_SECURITY.masked_email|escape:'html'}</strong>
-                  <small>验证时间 {$GZCA_EMAIL_SECURITY.verified_at|escape:'html'}，忘记密码时验证码会发送到此邮箱。</small>
+                    <span>已于 {$GZCA_EMAIL_SECURITY.verified_at|escape:'html'} 完成验证</span>
                 {else}
-                  <strong>尚未绑定恢复邮箱</strong>
-                  <small>请由最终客户绑定自己的邮箱，交付方邮箱不会作为默认恢复邮箱。</small>
+                    <strong>尚未绑定</strong>
+                    <span>绑定客户自己的邮箱后，可用于找回密码和安全验证。</span>
                 {/if}
+                </div>
               </div>
 
               {if !$GZCA_EMAIL_SECURITY.storage_ready}
                 <div class="gzca-security-alert is-danger"><strong>账号安全数据表尚未就绪</strong><span>请先完成插件升级，当前不会写入或替换邮箱。</span></div>
               {elseif !$GZCA_SECURITY_MAIL.ready}
-                <div class="gzca-security-alert is-warning"><strong>暂时不能发送验证码</strong><span>{$GZCA_SECURITY_MAIL.message|escape:'html'}</span></div>
+                <div class="gzca-security-alert is-warning"><strong>绑定入口已保留</strong><span>{$GZCA_SECURITY_MAIL.message|escape:'html'} 配置完成后即可发送验证码。</span></div>
               {elseif $GZCA_EMAIL_SECURITY.requires_binding}
-                <div class="gzca-security-alert is-info"><strong>请绑定客户邮箱</strong><span>验证成功后即可用于找回密码和高风险操作确认。</span></div>
+                <div class="gzca-security-alert is-info"><strong>可以开始绑定</strong><span>先发送验证码，再完成邮箱验证。</span></div>
               {/if}
             </div>
 
-            {if $GZCA_EMAIL_SECURITY.storage_ready and $GZCA_SECURITY_MAIL.ready}
-              <div class="gzca-security-section">
+            {if $GZCA_EMAIL_SECURITY.storage_ready}
+              <div class="gzca-email-binding">
                 <div class="gzca-security-section-head">
                   <strong>{if $GZCA_EMAIL_SECURITY.verified}更换恢复邮箱{else}绑定恢复邮箱{/if}</strong>
                   <span>需要当前密码和新邮箱验证码</span>
@@ -424,7 +427,8 @@
                       <input type="hidden" name="gzca_action" value="send_bind_email_code">
                       <label class="gzca-field"><span>客户的新邮箱</span><input type="email" name="new_email" value="{$GZCA_SECURITY_FORM.new_email|escape:'html'}" maxlength="255" autocomplete="email" required><small>验证成功前不会替换当前账号资料。</small></label>
                       <label class="gzca-field"><span>当前管理员密码</span><input type="password" name="current_password" maxlength="256" autocomplete="current-password" required></label>
-                      <button class="gzca-button gzca-button-quiet" type="submit">发送邮箱验证码</button>
+                      <button class="gzca-button gzca-button-quiet" type="submit" {if !$GZCA_SECURITY_MAIL.ready}disabled aria-disabled="true"{/if}>发送邮箱验证码</button>
+                      {if !$GZCA_SECURITY_MAIL.ready}<small class="gzca-form-note">配置系统发件邮箱后，此按钮会自动开放。</small>{/if}
                     </form>
                   </section>
 
@@ -436,7 +440,7 @@
                       <label class="gzca-field"><span>同一个新邮箱</span><input type="email" name="new_email" value="{$GZCA_SECURITY_FORM.new_email|escape:'html'}" maxlength="255" autocomplete="email" required></label>
                       <label class="gzca-field"><span>六位验证码</span><input type="text" name="verification_code" inputmode="numeric" pattern="[0-9]{6}" maxlength="6" autocomplete="one-time-code" required>{if $GZCA_EMAIL_SECURITY.bind_challenge.active}<small>验证码有效至 {$GZCA_EMAIL_SECURITY.bind_challenge.expires_at|escape:'html'}。</small>{/if}</label>
                       <label class="gzca-field"><span>再次输入当前密码</span><input type="password" name="current_password" maxlength="256" autocomplete="current-password" required></label>
-                      <button class="gzca-button gzca-button-primary" type="submit">验证并绑定邮箱</button>
+                      <button class="gzca-button gzca-button-primary" type="submit" {if !$GZCA_SECURITY_MAIL.ready and !$GZCA_EMAIL_SECURITY.bind_challenge.active}disabled aria-disabled="true"{/if}>验证并绑定邮箱</button>
                     </form>
                   </section>
                 </div>
@@ -451,8 +455,8 @@
             </div>
             <div class="gzca-security-device-row">
               <div class="gzca-security-device-copy">
-                <strong>退出其他设备</strong>
-                <span>撤销其他浏览器的会话和记住登录，当前浏览器继续保持登录。</span>
+                <span class="gzca-setting-icon">设</span>
+                <div><strong>退出其他设备</strong><span>撤销其他浏览器的会话和记住登录，当前浏览器继续保持登录。</span></div>
               </div>
               <form class="gzca-security-device-form" action="{$GZCA_URLS.security|escape:'html'}#login-devices" method="post">
                 <input type="hidden" name="pwg_token" value="{$GZCA_TOKEN|escape:'html'}">
@@ -505,9 +509,10 @@
                 </div>
               </div>
             {else}
-              <div class="gzca-security-empty">
-                <strong>请先绑定恢复邮箱</strong>
-                <span>邮箱验证完成后，这里会开放管理员密码修改功能。</span>
+              <div class="gzca-security-locked">
+                <span class="gzca-setting-icon">锁</span>
+                <div><strong>请先绑定恢复邮箱</strong><span>邮箱验证完成后，这里会开放管理员密码修改功能。</span></div>
+                <a class="gzca-button gzca-button-quiet" href="#recovery-email">前往绑定邮箱</a>
               </div>
             {/if}
           </section>

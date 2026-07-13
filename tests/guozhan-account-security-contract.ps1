@@ -129,14 +129,15 @@ if ($admin -notmatch "redirect\s*\(\s*gzca_admin_url\('security'" -or
 if ($admin -notmatch 'requires_binding[\s\S]{0,180}mail_status\[''ready''\][\s\S]{0,180}''security''\s*!==\s*\$tab') {
     $failures.Add('First-login binding can lock the customer out before the private SMTP sender is ready.')
 }
-if ($template -notmatch '账号安全' -or
+if ($template -notmatch '账号中心' -or
+    $template -notmatch 'gzca-account-summary' -or
     $template -notmatch 'name="new_email"' -or
     $template -notmatch 'name="current_password"' -or
     $template -notmatch 'name="verification_code"' -or
     $template -notmatch 'autocomplete="one-time-code"' -or
     $template -notmatch 'name="new_password"' -or
     $template -notmatch 'name="new_password_confirm"') {
-    $failures.Add('The responsive account-security UI is missing required binding and password-verification controls.')
+    $failures.Add('The responsive account center is missing the account summary, binding, or password-verification controls.')
 }
 if ($template -notmatch 'id="login-devices"' -or
     $template -notmatch 'value="revoke_other_sessions"' -or
@@ -144,14 +145,22 @@ if ($template -notmatch 'id="login-devices"' -or
     $template -notmatch '退出其他设备') {
     $failures.Add('The account-security page has no explicit password-confirmed control for logging out other devices.')
 }
-if ($template -notmatch 'gzca-security-overview' -or
+if ($template -notmatch 'gzca-email-overview' -or
+    $template -notmatch 'gzca-email-binding' -or
     $template -notmatch 'gzca-security-steps' -or
     $template -notmatch 'gzca-security-step') {
-    $failures.Add('The account-security workflow is not grouped into a clear status overview and numbered steps.')
+    $failures.Add('The account-center workflow is not grouped into a clear email overview and numbered steps.')
+}
+if ($template -notmatch '\{if \$GZCA_EMAIL_SECURITY\.storage_ready\}[\s\S]{0,500}gzca-email-binding' -or
+    $template -match '\{if \$GZCA_EMAIL_SECURITY\.storage_ready and \$GZCA_SECURITY_MAIL\.ready\}' -or
+    $template -notmatch '\{if !\$GZCA_SECURITY_MAIL\.ready\}disabled aria-disabled="true"\{/if\}' -or
+    $template -notmatch '绑定入口已保留') {
+    $failures.Add('The recovery-email controls disappear when SMTP is unavailable instead of remaining visible and safely disabled.')
 }
 if ($style -notmatch '\.gzca-security-layout\s*\{[^}]*grid-template-columns:\s*minmax\(0,\s*1fr\)' -or
     $style -notmatch '\.gzca-security-layout\s*\{[^}]*max-width:' -or
-    $style -notmatch '\.gzca-security-device-form') {
+    $style -notmatch '\.gzca-security-device-form' -or
+    $style -notmatch '\.gzca-account-summary') {
     $failures.Add('The account-security page is not a constrained single-column workflow with a dedicated device form.')
 }
 if ($style -notmatch '@media\s*\(max-width:\s*720px\)[\s\S]*?\.gzca-security') {
