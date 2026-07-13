@@ -940,6 +940,10 @@ foreach ($parent_categories as $parent_category)
   $parent_category['children'] = array_values(array_filter($categories, function ($category) use ($parent_category) {
     return (int)$category['id_uppercat'] === (int)$parent_category['id'];
   }));
+  if ('exhibition' === $parent_category['category_kind'])
+  {
+    usort($parent_category['children'], 'gzca_compare_exhibition_category_options');
+  }
   $category_groups[] = $parent_category;
 }
 

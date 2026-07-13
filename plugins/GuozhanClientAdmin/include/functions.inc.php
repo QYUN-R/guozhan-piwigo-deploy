@@ -897,19 +897,26 @@ function gzca_compare_exhibition_category_options($left, $right)
     return !empty($left['reserved']) ? 1 : -1;
   }
 
+  $left_name = isset($left['raw_name']) ? (string)$left['raw_name'] : (isset($left['name']) ? (string)$left['name'] : '');
+  $right_name = isset($right['raw_name']) ? (string)$right['raw_name'] : (isset($right['name']) ? (string)$right['name'] : '');
+
   if (!empty($left['reserved']))
   {
-    return strnatcasecmp((string)$left['raw_name'], (string)$right['raw_name']);
+    return strnatcasecmp($left_name, $right_name);
   }
 
-  $left_order = isset($left['sort_order']) ? (int)$left['sort_order'] : PHP_INT_MAX;
-  $right_order = isset($right['sort_order']) ? (int)$right['sort_order'] : PHP_INT_MAX;
+  $left_order = isset($left['sort_order'])
+    ? (int)$left['sort_order']
+    : (isset($left['custom_sort_order']) ? (int)$left['custom_sort_order'] : PHP_INT_MAX);
+  $right_order = isset($right['sort_order'])
+    ? (int)$right['sort_order']
+    : (isset($right['custom_sort_order']) ? (int)$right['custom_sort_order'] : PHP_INT_MAX);
   if ($left_order !== $right_order)
   {
     return $left_order < $right_order ? -1 : 1;
   }
 
-  return strnatcasecmp((string)$left['raw_name'], (string)$right['raw_name']);
+  return strnatcasecmp($left_name, $right_name);
 }
 
 function gzca_category_option_groups($categories)

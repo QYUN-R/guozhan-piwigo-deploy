@@ -130,6 +130,33 @@
     });
   }
 
+  const categoryNameCollator = new Intl.Collator("zh-CN", {
+    numeric: true,
+    sensitivity: "base"
+  });
+
+  function compareCategoryRank(a, b) {
+    return Number(a?.rank || 0) - Number(b?.rank || 0)
+      || categoryNameCollator.compare(String(a?.name || ""), String(b?.name || ""));
+  }
+
+  function compareExhibitionCategories(a, b) {
+    const aReserved = Boolean(a?.reserved);
+    const bReserved = Boolean(b?.reserved);
+    if (aReserved !== bReserved) return aReserved ? 1 : -1;
+    if (aReserved) {
+      return categoryNameCollator.compare(String(a?.name || ""), String(b?.name || ""));
+    }
+    return compareCategoryRank(a, b);
+  }
+
+  function orderedCategoryChildren(parent, items) {
+    const sorter = isCaaCategory(parent) || parent?.kind === "exhibition"
+      ? compareExhibitionCategories
+      : compareCategoryRank;
+    return (items || []).slice().sort(sorter);
+  }
+
   directoryGroups.splice(0, directoryGroups.length, ...orderDirectoryGroups(directoryGroups));
 
   function pagePrefix() {
@@ -1146,7 +1173,7 @@
   }
 
   function apiDirectoryCardMarkup(item, index) {
-    const visibleLimit = 3;
+    const visibleLimit = item.kind === "exhibition" ? item.links.length : 3;
     const hiddenCount = Math.max(0, item.links.length - visibleLimit);
     const links = item.links.map((link, linkIndex) => {
       const extra = linkIndex >= visibleLimit ? " is-extra" : "";
@@ -1186,21 +1213,21 @@
       .sort((a, b) => Number(a.rank || 0) - Number(b.rank || 0) || String(a.name || "").localeCompare(String(b.name || "")));
 
     const groups = parents.map((parent) => {
-      const childItems = (children.get(Number(parent.id)) || []).slice()
-        .sort((a, b) => Number(a.rank || 0) - Number(b.rank || 0) || String(a.name || "").localeCompare(String(b.name || "")));
+      const childItems = orderedCategoryChildren(parent, children.get(Number(parent.id)) || []);
       const caaGroup = isCaaCategory(parent);
       const linkItems = caaGroup
-        ? [parent]
+        ? [parent].concat(childItems)
         : (categoryCanShowDirectEntry(parent) ? [parent].concat(childItems) : (childItems.length ? childItems : [parent]));
       return {
         title: parent.name || "作品分类",
         desc: parent.comment || "后台分类已接入，可在后台新增和调整作品。",
+        kind: parent.kind || "catalog",
         links: linkItems.map((category) => {
-          const isParentDirect = childItems.length && Number(category.id) === Number(parent.id);
+          const isParentDirect = Number(category.id) === Number(parent.id);
           return {
             id: category.id,
             key: category.key,
-            name: (caaGroup || isParentDirect) ? "全部作品" : (category.name || "未命名分类"),
+            name: isParentDirect ? "全部作品" : (category.name || "未命名分类"),
             code: category.code_prefix || "",
             href: categoryHrefFromApi(category)
           };
@@ -1271,13 +1298,15 @@
       const current = visibleList.find((item) => currentId && Number(item.id) === currentId) || visibleList.find((item) => item.key === currentKey);
       if (!current) return;
       const parent = current.id_uppercat && byId.has(Number(current.id_uppercat)) ? byId.get(Number(current.id_uppercat)) : current;
-      const siblings = visibleList.filter((item) => Number(item.id_uppercat || 0) === Number(parent.id))
-        .sort((a, b) => Number(a.rank || 0) - Number(b.rank || 0));
+      const siblings = orderedCategoryChildren(
+        parent,
+        visibleList.filter((item) => Number(item.id_uppercat || 0) === Number(parent.id))
+      );
       const caaGroup = isCaaCategory(parent);
-      const primary = caaGroup ? [parent] : (categoryCanShowDirectEntry(parent) ? [parent].concat(siblings) : (siblings.length ? siblings : [parent]));
+      const primary = caaGroup ? [parent].concat(siblings) : (categoryCanShowDirectEntry(parent) ? [parent].concat(siblings) : (siblings.length ? siblings : [parent]));
       const primaryLinks = primary.map((item) => {
         const active = Number(item.id) === Number(current.id) || item.key === current.key ? ' class="is-active"' : "";
-        const label = (caaGroup || (siblings.length && Number(item.id) === Number(parent.id))) ? "全部作品" : (item.name || "分类");
+        const label = Number(item.id) === Number(parent.id) ? "全部作品" : (item.name || "分类");
         return '<a href="' + escapeHtml(categoryHrefFromApi(item)) + '"' + active + '>' + escapeHtml(label) + ' <span>' + escapeHtml(item.code_prefix || "") + '</span></a>';
       }).join("");
       const otherParents = visibleList
@@ -1407,6 +1436,29 @@
     '</article>';
   }
 
+  function categoryContextFromList(list, requestedKey, requestedId) {
+    const matchedCategory = list.find((item) => requestedId && Number(item.id) === Number(requestedId)) || list.find((item) => item.key === requestedKey) || null;
+    const byId = new Map(list.map((item) => [Number(item.id), item]));
+    const parentApi = matchedCategory?.id_uppercat && byId.has(Number(matchedCategory.id_uppercat)) ? byId.get(Number(matchedCategory.id_uppercat)) : null;
+    const caaBoard = isCaaCategory(parentApi || matchedCategory) || isCaaKey(requestedKey);
+    const apiCategory = matchedCategory;
+    const caaRoot = caaBoard ? (parentApi || matchedCategory) : null;
+    const key = apiCategory?.key || (caaBoard ? "caa-exhibitions" : requestedKey);
+    const data = categories[key] || localDataForWork(apiCategory, key);
+    const caaChild = caaBoard && Boolean(parentApi);
+    return {
+      key,
+      data,
+      apiCategory,
+      parentApi,
+      isCaaBoard: caaBoard,
+      parentName: caaBoard ? (caaRoot?.name || "中美协展览专项画稿") : (data.parent || parentApi?.name || apiCategory?.name || "作品分类"),
+      name: caaBoard ? (caaChild ? (apiCategory?.name || data.name) : "全部作品") : (data.direct ? "全部作品" : (data.name || apiCategory?.name || "作品")),
+      title: caaBoard ? (caaChild ? (apiCategory?.name || data.title) : (caaRoot?.name || "中美协展览专项画稿")) : (data.title || apiCategory?.name || "作品分类"),
+      desc: apiCategory?.comment || data.desc || "后台分类作品。"
+    };
+  }
+
   async function getCategoryContext() {
     const requestedKey = params.get("cat") || "ink-landscape";
     const requestedId = Number(params.get("cat_id") || 0);
@@ -1416,24 +1468,7 @@
     } catch (error) {
       console.warn("Guozhan category API unavailable", error);
     }
-    const matchedCategory = list.find((item) => requestedId && Number(item.id) === Number(requestedId)) || list.find((item) => item.key === requestedKey) || null;
-    const byId = new Map(list.map((item) => [Number(item.id), item]));
-    const parentApi = matchedCategory?.id_uppercat && byId.has(Number(matchedCategory.id_uppercat)) ? byId.get(Number(matchedCategory.id_uppercat)) : null;
-    const caaBoard = isCaaCategory(parentApi || matchedCategory) || isCaaKey(requestedKey);
-    const apiCategory = caaBoard && parentApi ? parentApi : matchedCategory;
-    const key = apiCategory?.key || (caaBoard ? "caa-exhibitions" : requestedKey);
-    const data = categories[key] || localDataForWork(apiCategory, key);
-    return {
-      key,
-      data,
-      apiCategory,
-      parentApi,
-      isCaaBoard: caaBoard,
-      parentName: caaBoard ? (apiCategory?.name || parentApi?.name || "中美协展览专项画稿") : (data.parent || parentApi?.name || apiCategory?.name || "作品分类"),
-      name: caaBoard ? "全部作品" : (data.direct ? "全部作品" : (data.name || apiCategory?.name || "作品")),
-      title: caaBoard ? (apiCategory?.name || parentApi?.name || "中美协展览专项画稿") : (data.title || apiCategory?.name || "作品分类"),
-      desc: apiCategory?.comment || data.desc || "后台分类作品。"
-    };
+    return categoryContextFromList(list, requestedKey, requestedId);
   }
 
   async function mountHomeStream() {
@@ -1529,7 +1564,6 @@
         const query = { sort: currentSort, recursive: true, fallbackKey: context.key };
         if (context.apiCategory?.id) {
           query.cat_id = context.apiCategory.id;
-          if (context.isCaaBoard) query.query = (context.apiCategory.code_prefix || "ZX") + "-";
         }
         else if (context.isCaaBoard) query.query = "ZX-";
         else query.query = context.title;
