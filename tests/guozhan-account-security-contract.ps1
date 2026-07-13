@@ -167,7 +167,8 @@ if ($style -notmatch '\.gzca-security-layout\s*\{[^}]*grid-template-columns:\s*m
 if ($style -notmatch '@media\s*\(max-width:\s*720px\)[\s\S]*?\.gzca-security') {
     $failures.Add('The account-security page has no explicit mobile layout.')
 }
-if ($adminHeader -notmatch '\$lang_info\.code\|replace:''_'':''-''') {
+if ($adminHeader -notmatch '\$lang_info\.code eq ''cn''\}zh-CN' -or
+    $adminHeader -notmatch '\$lang_info\.code\|replace:''_'':''-''') {
     $failures.Add('The administrator document language is not normalized to a valid BCP 47 tag.')
 }
 if ($style -notmatch 'body#theAdminPage\s+#footer') {

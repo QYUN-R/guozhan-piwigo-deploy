@@ -3,7 +3,7 @@
           don't confuse with the public page header
 *}
 <!DOCTYPE html>
-<html lang="{$lang_info.code|replace:'_':'-'}" dir="{$lang_info.direction}">
+<html lang="{if $lang_info.code eq 'cn'}zh-CN{else}{$lang_info.code|replace:'_':'-'}{/if}" dir="{$lang_info.direction}">
 <head>
 {if $SHOW_MOBILE_APP_BANNER}
 <meta name="apple-itunes-app" content="app-id=472225196">
