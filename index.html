@@ -1,0 +1,65 @@
+<!doctype html>
+<html lang="zh-CN">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>图物计划国展素材馆 · 首页</title>
+  <link rel="stylesheet" href="assets/guozhan.css?v=20260713-mobile-audit-2">
+</head>
+<body data-home-page>
+  <div class="site-shell">
+    <header class="topbar" data-od-id="site-header">
+      <div class="container topbar-inner">
+        <a class="brand" href="index.html" aria-label="返回首页"><span class="brand-mark"><img src="assets/logo-mark.png?v=20260712-logo-fulltext" alt=""></span><span class="brand-text"><strong>图物计划国展素材馆</strong><span>AI Graphics Learning Plan</span></span></a>
+        <nav class="nav" data-nav aria-label="主导航"><a href="index.html" aria-current="page">首页</a><a href="screens/categories.html">作品分类</a><a href="screens/search.html">搜索</a><a href="screens/contact.html">联系客服</a></nav>
+        <div class="nav-actions"><button class="menu-toggle" type="button" data-menu-toggle aria-label="打开导航" aria-expanded="false">☰</button></div>
+      </div>
+    </header>
+
+    <main>
+      <section class="hero" data-od-id="home-hero">
+        <div class="hero-canvas" role="img" aria-label="国展作品素材展厅">
+          <div class="hero-slide"></div>
+          <div class="hero-slide"></div>
+          <div class="hero-slide"></div>
+        </div>
+        <div class="container">
+          <div class="hero-content">
+            <h1>国展绘画作品素材库</h1>
+            <p class="hero-lead">围绕国画、油画、版画、雕塑、漆画、水彩等方向整理作品，按分类、题材与编号高效定位所需素材。</p>
+          <form class="hero-search" action="screens/search.html" method="get" data-search-form data-od-id="home-search-form">
+            <div class="search-form">
+              <label class="small" style="position:absolute;clip:rect(0 0 0 0);" for="home-q">搜索作品</label>
+              <input id="home-q" class="search-input" name="q" placeholder="输入作品编号、画种、题材或关键词..." autocomplete="off">
+              <button class="btn btn-primary" type="submit">搜索作品</button>
+            </div>
+            <div class="quick-tags" aria-label="热门搜索">
+              <a class="tag" href="screens/search.html?q=国画">国画</a>
+              <a class="tag" href="screens/search.html?q=油画">油画</a>
+              <a class="tag" href="screens/search.html?q=中美协展览专项画稿">中美协展览专项画稿</a>
+            </div>
+          </form>
+            <div class="hero-meta"><span>作品图库</span><span>分类选稿</span><span>精选作品</span></div>
+          </div>
+        </div>
+      </section>
+      <section class="section" data-od-id="home-directory"><div class="container"><div class="section-head"><div><p class="eyebrow">作品分类</p><h2>按画种与题材浏览</h2></div></div><div class="directory"></div></div></section>
+      <section class="section section-gallery-stream" data-od-id="home-featured-works">
+        <div class="container">
+          <div class="section-head"><div><h2>全部作品</h2></div></div>
+          <div class="recommend-filter home-sort" data-home-sort-group aria-label="首页作品排序"><button class="filter-chip" type="button" aria-pressed="true" data-home-sort="featured">精美作品</button><button class="filter-chip" type="button" aria-pressed="false" data-home-sort="downloads">下载量高</button><button class="filter-chip" type="button" aria-pressed="false" data-home-sort="hot">热门作品</button><button class="filter-chip" type="button" aria-pressed="false" data-home-sort="newest">最新作品</button></div>
+          <div class="gallery-grid stream-grid" data-home-stream data-od-id="home-work-stream"></div>
+          <div class="pagination" data-home-pagination aria-label="首页作品分页"><button class="btn btn-secondary" type="button" data-home-prev>上一页</button><span data-home-status>第 1 / 1 页</span><button class="btn btn-primary" type="button" data-home-next>下一页</button></div>
+        </div>
+      </section>
+    </main>
+
+    <footer class="footer" data-od-id="site-footer"><div class="container footer-inner"><span data-footer-brand>© 图物计划国展素材馆</span><span>作品图库 · 分类选稿 · 编号咨询</span></div></footer>
+  </div>
+
+  <div class="modal-backdrop" data-contact-modal role="dialog" aria-modal="true" aria-label="客服联系方式"><div class="modal"><div class="modal-head"><div><h2>联系客服</h2><p class="muted">提供作品编号或页面截图，客服将协助确认高清素材、同类作品与使用方式。</p></div><button class="icon-button" type="button" data-close-contact aria-label="关闭">×</button></div><div class="contact-band"><div class="qr-box">客服二维码</div><div><p class="eyebrow">客服微信</p><h3 data-contact-wechat>aiguozhanhuihua</h3><p class="muted">复制微信号或扫码添加客服，提供作品编号即可确认素材。</p><div class="contact-actions"><button class="btn btn-primary" data-copy-wechat="aiguozhanhuihua">复制微信号</button><a class="btn btn-secondary" href="screens/contact.html">查看联系方式页</a></div></div></div></div></div>
+  <div class="floating-service"><button class="btn btn-primary" type="button" data-open-contact>联系客服</button></div>
+  <div class="toast" data-toast role="status" aria-live="polite"></div>
+  <script src="assets/guozhan.js?v=20260713-rounded-favicon-1"></script>
+</body>
+</html>

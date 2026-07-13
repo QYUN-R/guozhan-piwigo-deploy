@@ -1,0 +1,30 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 1600 900" role="img" aria-label="画卷纸纹背景">
+  <defs>
+    <linearGradient id="paper" x1="0" y1="0" x2="1" y2="0">
+      <stop offset="0" stop-color="#d5c5a7"/>
+      <stop offset=".18" stop-color="#f2e8d4"/>
+      <stop offset=".82" stop-color="#eee1c8"/>
+      <stop offset="1" stop-color="#c3b18f"/>
+    </linearGradient>
+    <filter id="rough">
+      <feTurbulence type="fractalNoise" baseFrequency=".015" numOctaves="3" seed="8"/>
+      <feColorMatrix type="saturate" values="0"/>
+      <feComponentTransfer>
+        <feFuncA type="table" tableValues="0 .18"/>
+      </feComponentTransfer>
+    </filter>
+  </defs>
+  <rect width="1600" height="900" fill="url(#paper)"/>
+  <rect width="1600" height="900" filter="url(#rough)" opacity=".46"/>
+  <g opacity=".42" fill="#2b3531">
+    <path d="M235 690c74-180 171-284 292-312 110-25 201 38 272 188 62-110 136-176 223-198 115-29 223 21 323 151 72 94 157 147 255 160v221H0V758c85-4 163-27 235-68z"/>
+  </g>
+  <g opacity=".18" fill="none" stroke="#46382d" stroke-width="2">
+    <path d="M198 165c160 68 301 65 422-9s259-76 414-6c156 70 282 72 378 6"/>
+    <path d="M148 250c111 44 218 44 321 0s212-40 327 12c121 54 241 53 360-3 108-51 207-54 296-9"/>
+  </g>
+  <g fill="#a4432d" opacity=".8">
+    <rect x="1180" y="610" width="150" height="150" rx="8"/>
+    <path d="M1214 654h82v12h-82zm0 36h82v12h-82zm0 36h52v12h-52z" fill="#f7efe0"/>
+  </g>
+</svg>

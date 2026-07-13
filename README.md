@@ -1,3 +1,29 @@
+## Guozhan deployment package
+
+This repository contains the current Guozhan gallery deployment package:
+
+- Static customer frontend: `index.html`, `screens/`, and `assets/`
+- Piwigo 16.4.0 backend and WebService API
+- Custom admin plugin: `plugins/GuozhanClientAdmin` version `0.6.1`
+- Sequential artwork upload batches of 20, 30, 40, or 50 images (20 by default)
+
+The production-style container layout serves this checkout from `/config/www`.
+Nginx must prefer `index.html` before `index.php` so the static customer frontend
+is the public entry point while Piwigo continues to provide the database, admin,
+authentication, image storage, and WebService endpoints.
+
+Runtime data is intentionally not stored in Git. Do not commit or overwrite:
+
+- `local/config/database.inc.php` or other server-local configuration
+- `_data/` caches and generated derivatives
+- `upload/` originals
+- `galleries/` synchronized media
+- administrator credentials, QR images, API keys, or database dumps
+
+See [GUOZHAN-DEPLOY.md](GUOZHAN-DEPLOY.md) for deployment and validation notes.
+
+---
+
 <img src="https://piwigo.org/plugins/piwigo-piwigodotorg/images/piwigo.org.svg" width="200" alt="Piwigo logo">
 
 Manage your photo library. Piwigo is open source photo gallery software for the web. Designed for organisations, teams and individuals.

@@ -1,3 +1,6 @@
+{html_head}
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+{/html_head}
 {combine_css path=$GZCA_PATH|cat:'assets/admin.css'}
 {combine_script id='gzca.admin' load='footer' require='jquery' path=$GZCA_PATH|cat:'assets/admin.js'}
 
@@ -10,10 +13,10 @@
 
     <nav class="gzca-nav" aria-label="客户后台导航">
       <a href="{$GZCA_URLS.dashboard|escape:'html'}" class="{if $GZCA_TAB eq 'dashboard'}is-active{/if}"><span>概</span>工作台</a>
+      <a href="{$GZCA_URLS.home|escape:'html'}" class="{if $GZCA_TAB eq 'home'}is-active{/if}"><span>首</span>首页轮播</a>
       <a href="{$GZCA_URLS.upload|escape:'html'}" class="{if $GZCA_TAB eq 'upload'}is-active{/if}"><span>传</span>上传作品</a>
       <a href="{$GZCA_URLS.works|escape:'html'}" class="{if $GZCA_TAB eq 'works'}is-active{/if}"><span>图</span>作品管理</a>
       <a href="{$GZCA_URLS.categories|escape:'html'}" class="{if $GZCA_TAB eq 'categories'}is-active{/if}"><span>类</span>分类管理</a>
-      <a href="{$GZCA_URLS.competition|escape:'html'}" class="{if $GZCA_TAB eq 'competition'}is-active{/if}"><span>赛</span>比赛管理</a>
       <a href="{$GZCA_URLS.contact|escape:'html'}" class="{if $GZCA_TAB eq 'contact'}is-active{/if}"><span>牌</span>品牌与客服</a>
     </nav>
 
@@ -27,10 +30,45 @@
     <header class="gzca-page-header">
       <div>
         {if $GZCA_TAB eq 'dashboard'}<p>内容总览</p><h2>工作台</h2>{/if}
-        {if $GZCA_TAB eq 'upload'}<p>添加图库内容</p><h2>上传作品</h2>{/if}
+        {if $GZCA_TAB eq 'home'}<p>首页视觉与轮播壁纸</p><h2>首页轮播</h2>{/if}
+        {if $GZCA_TAB eq 'home'}
+      <form class="gzca-home-hero-layout" action="{$GZCA_URLS.home|escape:'html'}" method="post" enctype="multipart/form-data">
+        <input type="hidden" name="pwg_token" value="{$GZCA_TOKEN|escape:'html'}"><input type="hidden" name="gzca_action" value="save_home_hero">
+        <section class="gzca-panel">
+          <div class="gzca-panel-head"><div><p>首页第一屏</p><h3>轮播壁纸管理</h3></div><span class="gzca-help">最多 5 个轮播位</span></div>
+          <div class="gzca-hero-manager">
+            {foreach from=$GZCA_HERO_SLIDES item=slide}
+              <article class="gzca-hero-slide-card {if !$slide.enabled}is-disabled{/if}">
+                <div class="gzca-hero-preview">{if $slide.url}<img src="{$slide.url|escape:'html'}" alt="{$slide.title|escape:'html'}">{else}<span>未设置图片</span>{/if}</div>
+                <div class="gzca-hero-fields">
+                  <div class="gzca-hero-card-head"><strong>轮播位 {$slide.index+1}</strong><span class="gzca-status {if $slide.enabled}is-online{else}is-offline{/if}">{if $slide.enabled}启用中{else}已停用{/if}</span></div>
+                  <label class="gzca-check"><input type="checkbox" name="hero_enabled[{$slide.index}]" value="1" {if $slide.enabled}checked{/if}><span><strong>启用这个轮播位</strong><small>停用后前台不会播放这张图，图片文件会保留。</small></span></label>
+                  <label class="gzca-field"><span>后台识别名称</span><input type="text" name="hero_title[{$slide.index}]" value="{$slide.title|escape:'html'}" maxlength="80"></label>
+                  <label class="gzca-field"><span>图片焦点位置</span><select name="hero_position[{$slide.index}]"><option value="center" {if $slide.position eq 'center'}selected{/if}>居中</option><option value="center top" {if $slide.position eq 'center top'}selected{/if}>居上</option><option value="center bottom" {if $slide.position eq 'center bottom'}selected{/if}>居下</option><option value="left center" {if $slide.position eq 'left center'}selected{/if}>偏左</option><option value="right center" {if $slide.position eq 'right center'}selected{/if}>偏右</option></select></label>
+                  <label class="gzca-field"><span>替换壁纸</span><input type="file" name="hero_image_{$slide.index}" accept="image/jpeg,image/png,image/webp"><small>建议横图，JPG/PNG/WebP，最大 8MB；过大的图片会自动压缩。</small></label>
+                  <label class="gzca-check"><input type="checkbox" name="hero_clear[{$slide.index}]" value="1"><span><strong>{if $slide.default_url}恢复默认壁纸{else}清空这个预留位{/if}</strong><small>{if $slide.default_url}恢复到系统默认首页图。{else}清空后这个轮播位会停用。{/if}</small></span></label>
+                </div>
+              </article>
+            {/foreach}
+          </div>
+        </section>
+        <aside class="gzca-panel gzca-home-help-panel">
+          <div class="gzca-panel-head"><div><p>管理建议</p><h3>适合大量内容的后台结构</h3></div></div>
+          <div class="gzca-home-guide">
+            <div><strong>首页轮播</strong><span>只管理第一屏视觉图，不混入作品库。</span></div>
+            <div><strong>上传作品</strong><span>大量图片走自动分批上传队列。</span></div>
+            <div><strong>作品管理</strong><span>负责上架、下架、分类、排序和批量移动。</span></div>
+            <div><strong>分类管理</strong><span>负责板块增删、隐藏、分页筛选。</span></div>
+            <div><strong>品牌客服</strong><span>负责 Logo、二维码、微信和联系方式。</span></div>
+          </div>
+          <button class="gzca-button gzca-button-primary gzca-button-block" type="submit">保存首页轮播</button>
+        </aside>
+      </form>
+    {/if}
+
+    {if $GZCA_TAB eq 'upload'}<p>添加图库内容</p><h2>上传作品</h2>{/if}
         {if $GZCA_TAB eq 'works'}<p>编号、封面与上下架</p><h2>作品管理</h2>{/if}
         {if $GZCA_TAB eq 'categories'}<p>主分类与小分类</p><h2>分类管理</h2>{/if}
-        {if $GZCA_TAB eq 'competition'}<p>比赛类型与作品入口</p><h2>比赛管理</h2>{/if}
         {if $GZCA_TAB eq 'contact'}<p>同步前台 Logo 与联系方式</p><h2>品牌与客服</h2>{/if}
       </div>
       <div class="gzca-header-actions">
@@ -38,10 +76,6 @@
         {if $GZCA_TAB neq 'upload'}<a class="gzca-button gzca-button-primary" href="{$GZCA_URLS.upload|escape:'html'}">上传作品</a>{/if}
       </div>
     </header>
-
-    {if $GZCA_IS_WEBMASTER}
-      <div class="gzca-role-note"><strong>定制后台</strong><span>当前后台入口已接管为国展定制页面，原生 Piwigo 后台不再对客户后台展示。</span></div>
-    {/if}
 
     {if $GZCA_TAB eq 'dashboard'}
       <form class="gzca-setup-bar" action="{$GZCA_URLS.dashboard|escape:'html'}" method="post">
@@ -59,7 +93,6 @@
         <article><span>已上架</span><strong>{$GZCA_STATS.online}</strong><a href="{$GZCA_URLS.works|escape:'html'}&amp;status=online">查看上架内容</a></article>
         <article><span>已下架</span><strong>{$GZCA_STATS.offline}</strong><a href="{$GZCA_URLS.works|escape:'html'}&amp;status=offline">检查待发布内容</a></article>
         <article><span>作品分类</span><strong>{$GZCA_STATS.categories}</strong><a href="{$GZCA_URLS.categories|escape:'html'}">管理分类</a></article>
-        <article><span>比赛作品</span><strong>{$GZCA_STATS.competition}</strong><a href="{$GZCA_URLS.competition|escape:'html'}">管理比赛</a></article>
       </section>
 
       <section class="gzca-panel gzca-health-panel">
@@ -71,7 +104,6 @@
           <div class="{if $GZCA_DATABASE_HEALTH.connection}is-ok{else}is-warning{/if}"><span>数据库连接</span><strong>{if $GZCA_DATABASE_HEALTH.connection}已连接{else}连接失败{/if}</strong></div>
           <div class="{if $GZCA_DATABASE_HEALTH.works_table}is-ok{else}is-warning{/if}"><span>作品扩展表</span><strong>{if $GZCA_DATABASE_HEALTH.works_table}已创建{else}尚未创建{/if}</strong></div>
           <div class="{if $GZCA_DATABASE_HEALTH.categories_table}is-ok{else}is-warning{/if}"><span>分类扩展表</span><strong>{if $GZCA_DATABASE_HEALTH.categories_table}已创建{else}尚未创建{/if}</strong></div>
-          <div class="{if $GZCA_DATABASE_HEALTH.competition_media_table}is-ok{else}is-warning{/if}"><span>比赛类型表</span><strong>{if $GZCA_DATABASE_HEALTH.competition_media_table}已创建{else}尚未创建{/if}</strong></div>
           <div class="{if $GZCA_DATABASE_HEALTH.category_contract}is-ok{else}is-warning{/if}"><span>前台板块目录</span><strong>{if $GZCA_DATABASE_HEALTH.category_contract}39 个板块已对齐{else}请点击同步目录{/if}</strong></div>
           <div class="{if $GZCA_DATABASE_HEALTH.upload_contract}is-ok{else}is-warning{/if}"><span>上传落点</span><strong>{if $GZCA_DATABASE_HEALTH.upload_contract}39 个位置已开启{else}请点击同步目录{/if}</strong></div>
           <div class="{if $GZCA_DATABASE_HEALTH.web_services}is-ok{else}is-warning{/if}"><span>公开数据接口</span><strong>{if $GZCA_DATABASE_HEALTH.web_services}已启用{else}尚未启用{/if}</strong></div>
@@ -103,8 +135,8 @@
 
       <section class="gzca-guide">
         <div><b>1</b><span><strong>维护板块与画展</strong><small>常规分类、专项画展和预留画展都能独立改名、排序与隐藏。</small></span></div>
-        <div><b>2</b><span><strong>上传并关联比赛</strong><small>选择作品分类后批量上传，可同时加入水墨、油画、版画或水彩比赛。</small></span></div>
-        <div><b>3</b><span><strong>检查并上架</strong><small>确认标题、编号、封面和比赛归属后再展示到网站。</small></span></div>
+        <div><b>2</b><span><strong>上传并发布作品</strong><small>选择作品分类后批量上传，默认立即上架并公开展示。</small></span></div>
+        <div><b>3</b><span><strong>检查并上架</strong><small>确认标题、编号、封面、公开状态后再展示到网站。</small></span></div>
       </section>
     {/if}
 
@@ -114,14 +146,19 @@
         <input type="hidden" name="gzca_action" value="upload_works">
 
         <section class="gzca-panel gzca-upload-panel">
-          <div class="gzca-panel-head"><div><p>第一步</p><h3>选择作品图片</h3></div><span class="gzca-help">每次最多 20 张</span></div>
+          <div class="gzca-panel-head"><div><p>第一步</p><h3>选择作品图片</h3></div><span class="gzca-help">自动分批上传</span></div>
           <label class="gzca-dropzone" data-dropzone>
             <input type="file" name="artworks[]" accept="image/jpeg,image/png,image/webp" multiple required data-file-input>
             <span class="gzca-drop-icon">+</span>
             <strong>点击选择，或把图片拖到这里</strong>
-            <small>支持 JPG、PNG、WebP；原图仅供后台留存，网站列表使用约 432px 缩略图，进入详情后才加载约 1224px 展示图。</small>
+            <small>支持 JPG、PNG、WebP；可以一次选择大量图片，系统会自动按小批次上传，避免页面长时间卡死。过大的图片仍会压缩到约 1-3MB。</small>
           </label>
           <div class="gzca-file-list" data-file-list aria-live="polite"></div>
+          <div class="gzca-upload-queue" data-upload-progress hidden>
+            <div class="gzca-upload-progress-head"><strong data-upload-progress-title>准备上传</strong><span data-upload-progress-count>0 / 0</span></div>
+            <progress value="0" max="100" data-upload-progress-bar></progress>
+            <div class="gzca-upload-progress-log" data-upload-progress-log aria-live="polite"></div>
+          </div>
         </section>
 
         <aside class="gzca-panel gzca-upload-settings">
@@ -138,14 +175,14 @@
                 </optgroup>
               {/foreach}
             </select>
-            <small>前端出现的 10 个大板块、29 个子板块和预留画展都可以作为上传位置。</small>
+            <small>请选择准确板块：父级板块会在前台“全部作品 / 直接上传”入口显示；子板块会在对应子板块页面显示。</small>
           </label>
           <div class="gzca-upload-selection" data-upload-selection hidden><span>本批作品将上传到</span><strong data-upload-path></strong></div>
           <label class="gzca-field"><span>编号前缀</span><input type="text" name="code_prefix" placeholder="选择分类后自动填写" maxlength="48" data-code-prefix readonly><small>前缀跟随分类，系统自动生成连续编号，避免作品放错目录。</small></label>
-          <label class="gzca-field"><span>比赛展示</span><select name="competition_medium_id"><option value="0">不进入比赛</option>{foreach from=$GZCA_ACTIVE_COMPETITION_MEDIA item=medium}<option value="{$medium.id}">{$medium.name|escape:'html'}</option>{/foreach}</select><small>同一作品仍保留普通分类和原作品编号。</small></label>
-          <label class="gzca-check"><input type="checkbox" name="publish_now" value="1"><span><strong>上传后立即上架</strong><small>未勾选时先保存为下架状态，检查后再发布。</small></span></label>
+          <label class="gzca-field"><span>每批上传数量</span><select name="upload_batch_size" data-upload-batch-size><option value="20" selected>20 张（推荐）</option><option value="30">30 张</option><option value="40">40 张</option><option value="50">50 张（适合小图）</option></select><small>批次会依次处理；超过 72 MB 时系统自动拆小，避免服务器负载过高。</small></label>
+          <input type="hidden" name="publish_now" value="0"><label class="gzca-check"><input type="checkbox" name="publish_now" value="1" checked><span><strong>上传后立即上架</strong><small>默认上传后前台可见；取消勾选时先保存为下架状态，检查后再发布。</small></span></label>
           <label class="gzca-check"><input type="checkbox" name="set_cover" value="1"><span><strong>把第一张设为分类封面</strong><small>以后也可以在作品管理里重新设置。</small></span></label>
-          <button class="gzca-button gzca-button-primary gzca-button-block" type="submit">开始上传作品</button>
+          <button class="gzca-button gzca-button-primary gzca-button-block" type="submit" data-upload-submit>开始上传作品</button>
         </aside>
       </form>
     {/if}
@@ -158,15 +195,20 @@
             <input type="hidden" name="pwg_token" value="{$GZCA_TOKEN|escape:'html'}"><input type="hidden" name="gzca_action" value="save_work"><input type="hidden" name="image_id" value="{$GZCA_EDIT_WORK.id}">
             <div class="gzca-edit-preview"><img src="{$GZCA_EDIT_WORK.thumb_url|escape:'html'}" alt="{$GZCA_EDIT_WORK.display_name|escape:'html'}"><span>{$GZCA_EDIT_WORK.code|escape:'html'}</span></div>
             <div class="gzca-edit-fields">
+              {if $GZCA_EDIT_WORK.other_category_links|@count}
+                <div class="gzca-alert gzca-alert-warn"><strong>这张图片还出现在其他板块</strong><span>当前选择为“{$GZCA_EDIT_WORK.category_display_name|escape:'html'}”。保存后系统会只保留当前选择的板块。</span><ul>{foreach from=$GZCA_EDIT_WORK.other_category_links item=link}<li>{$link.path|escape:'html'} {if $link.prefix}<em>{$link.prefix|escape:'html'}</em>{/if}</li>{/foreach}</ul></div>
+              {/if}
+              {if $GZCA_EDIT_WORK.code_prefix_warning}
+                <div class="gzca-alert gzca-alert-warn"><strong>作品编号与所属分类不一致</strong><span>{$GZCA_EDIT_WORK.code_prefix_warning|escape:'html'}</span></div>
+              {/if}
               <label class="gzca-field"><span>作品名称</span><input type="text" name="title" value="{$GZCA_EDIT_WORK.display_name|escape:'html'}" required></label>
               <label class="gzca-field"><span>作品编号</span><input type="text" name="code" value="{$GZCA_EDIT_WORK.code|escape:'html'}" required><small>前台详情页和客服咨询都会显示这个编号。</small></label>
               <label class="gzca-field"><span>所属分类</span><select name="album_id" required>{foreach from=$GZCA_CATEGORY_OPTION_GROUPS item=group}<optgroup label="{$group.name|escape:'html'}">{foreach from=$group.options item=category}<option value="{$category.id}" {if $category.id eq $GZCA_EDIT_WORK.category_id}selected{/if}>{$category.option_label|escape:'html'} · {$category.prefix|escape:'html'}</option>{/foreach}</optgroup>{/foreach}</select></label>
-              <label class="gzca-field"><span>上架状态</span><select name="status"><option value="online" {if $GZCA_EDIT_WORK.status eq 'online'}selected{/if}>已上架</option><option value="offline" {if $GZCA_EDIT_WORK.status eq 'offline'}selected{/if}>已下架</option></select></label>
+              <label class="gzca-field"><span>上架状态</span><select name="status"><option value="online" {if $GZCA_EDIT_WORK.status eq 'online'}selected{/if}>已上架</option><option value="offline" {if $GZCA_EDIT_WORK.status eq 'offline'}selected{/if}>已下架</option></select><small>控制是否进入前台作品流。</small></label>
+              <label class="gzca-field"><span>公开状态</span><select name="visibility"><option value="public" {if $GZCA_EDIT_WORK.is_public}selected{/if}>公开</option><option value="private" {if $GZCA_EDIT_WORK.is_public}{else}selected{/if}>私密</option></select><small>前台只显示“已上架 + 公开”的作品。</small></label>
               <label class="gzca-field gzca-field-wide"><span>作品说明</span><textarea name="description" rows="4">{$GZCA_EDIT_WORK.description|escape:'html'}</textarea></label>
               <label class="gzca-field"><span>排序数字</span><input type="number" name="sort_order" value="{$GZCA_EDIT_WORK.sort_order}" min="0"><small>数字越小越靠前。</small></label>
               <label class="gzca-field"><span>下载量</span><input type="number" name="download_count" value="{$GZCA_EDIT_WORK.download_count}" min="0"><small>用于首页“下载量高”排序，可按实际数据调整。</small></label>
-              <label class="gzca-field"><span>比赛类型</span><select name="competition_medium_id"><option value="0">不进入比赛</option>{foreach from=$GZCA_COMPETITION_MEDIA item=medium}<option value="{$medium.id}" {if $medium.id eq $GZCA_EDIT_WORK.competition_medium_id}selected{/if}>{$medium.name|escape:'html'}{if $medium.status eq 'inactive'}（已停用）{/if}</option>{/foreach}</select></label>
-              <label class="gzca-field"><span>比赛排序</span><input type="number" name="competition_sort_order" value="{$GZCA_EDIT_WORK.competition_sort_order}" min="0"><small>数字越小，在比赛页面越靠前。</small></label>
               <label class="gzca-field"><span>浏览量</span><input type="number" value="{$GZCA_EDIT_WORK.hit}" readonly><small>Piwigo 自动累计，用于首页“热门作品”排序。</small></label>
               <label class="gzca-check"><input type="checkbox" name="featured" value="1" {if $GZCA_EDIT_WORK.featured}checked{/if}><span><strong>加入精选作品</strong><small>勾选后会优先出现在首页“精美作品”。</small></span></label>
               <label class="gzca-check"><input type="checkbox" name="set_cover" value="1"><span><strong>同时设为分类封面</strong></span></label>
@@ -176,37 +218,63 @@
         </section>
       {/if}
 
-      <section class="gzca-panel">
-        <form class="gzca-filterbar" action="{$ROOT_URL}admin.php" method="get" data-work-filter-form>
+      <section class="gzca-panel gzca-works-panel">
+        <form class="gzca-filterbar gzca-work-filterbar" action="{$ROOT_URL}admin.php" method="get" data-work-filter-form>
           <input type="hidden" name="page" value="plugin-GuozhanClientAdmin"><input type="hidden" name="tab" value="works">
           <label><span class="gzca-visually-hidden">搜索作品</span><input type="search" name="q" value="{$GZCA_FILTERS.q|escape:'html'}" placeholder="搜索名称、编号或文件名"></label>
           <select name="album_id" aria-label="筛选分类" data-auto-filter><option value="0">全部分类</option>{foreach from=$GZCA_CATEGORY_OPTION_GROUPS item=group}<optgroup label="{$group.name|escape:'html'}">{foreach from=$group.options item=category}<option value="{$category.id}" {if $category.id eq $GZCA_FILTERS.album_id}selected{/if}>{$category.option_label|escape:'html'} · {$category.prefix|escape:'html'}</option>{/foreach}</optgroup>{/foreach}</select>
-          <select name="status" aria-label="筛选状态" data-auto-filter><option value="">全部状态</option><option value="online" {if $GZCA_FILTERS.status eq 'online'}selected{/if}>已上架</option><option value="offline" {if $GZCA_FILTERS.status eq 'offline'}selected{/if}>已下架</option></select>
-          <select name="competition_medium_id" aria-label="筛选比赛类型" data-auto-filter><option value="0">全部比赛状态</option>{foreach from=$GZCA_COMPETITION_MEDIA item=medium}<option value="{$medium.id}" {if $medium.id eq $GZCA_FILTERS.competition_medium_id}selected{/if}>{$medium.name|escape:'html'}</option>{/foreach}</select>
+          <select name="status" aria-label="筛选上架状态" data-auto-filter><option value="">全部上架状态</option><option value="online" {if $GZCA_FILTERS.status eq 'online'}selected{/if}>已上架</option><option value="offline" {if $GZCA_FILTERS.status eq 'offline'}selected{/if}>已下架</option></select>
+          <select name="visibility" aria-label="筛选公开状态" data-auto-filter><option value="">全部公开状态</option><option value="public" {if $GZCA_FILTERS.visibility eq 'public'}selected{/if}>公开</option><option value="private" {if $GZCA_FILTERS.visibility eq 'private'}selected{/if}>私密</option></select>
+          <select name="per_page" aria-label="每页显示数量" data-auto-filter>{foreach from=$GZCA_PAGER.per_page_options item=per_page}<option value="{$per_page}" {if $GZCA_PAGER.per_page eq $per_page}selected{/if}>每页 {$per_page} 张</option>{/foreach}</select>
           <button class="gzca-button gzca-button-primary" type="submit">搜索</button>
         </form>
 
+        <form id="gzca-bulk-form" class="gzca-bulkbar" action="{$GZCA_URLS.works|escape:'html'}" method="post" data-bulk-form>
+          <input type="hidden" name="pwg_token" value="{$GZCA_TOKEN|escape:'html'}"><input type="hidden" name="gzca_action" value="bulk_works"><input type="hidden" name="bulk_delete_confirm" value="">
+          <label class="gzca-check-inline"><input type="checkbox" data-bulk-select-all><span>本页全选</span></label>
+          <span class="gzca-bulk-count" data-bulk-count>已选 0 张</span>
+          <select name="bulk_action" required data-bulk-action><option value="">批量操作</option><option value="online">批量上架</option><option value="offline">批量下架</option><option value="move">批量移动到板块</option><option value="delete">批量永久删除作品</option></select>
+          <select name="bulk_album_id" aria-label="批量移动目标板块"><option value="0">选择移动目标板块</option>{foreach from=$GZCA_CATEGORY_OPTION_GROUPS item=group}<optgroup label="{$group.name|escape:'html'}">{foreach from=$group.options item=category}<option value="{$category.id}">{$category.option_label|escape:'html'} · {$category.prefix|escape:'html'}</option>{/foreach}</optgroup>{/foreach}</select>
+          <button class="gzca-button gzca-button-primary" type="submit">执行</button>
+          <small class="gzca-bulk-help"><strong>当前筛选 {$GZCA_PAGER.total} 张 · 原图约 {$GZCA_PAGER.total_size_label|escape:'html'}</strong><span>批量移动只调整所属板块，不自动修改作品编号；批量永久删除会清理服务器图片文件和数据库记录。</span></small>
+        </form>
+
         <div class="gzca-table-wrap">
-          <table class="gzca-table">
-            <thead><tr><th>作品</th><th>编号</th><th>分类</th><th>比赛</th><th>状态</th><th>操作</th></tr></thead>
+          <table class="gzca-table gzca-work-table">
+            <thead><tr><th class="gzca-select-col"><input type="checkbox" aria-label="全选本页作品" data-bulk-select-all></th><th>作品</th><th>编号</th><th>分类</th><th>上架</th><th>公开</th><th>前台</th><th>操作</th></tr></thead>
             <tbody>
             {foreach from=$GZCA_WORKS item=work}
               <tr>
-                <td><div class="gzca-work-cell"><img src="{$work.thumb_url|escape:'html'}" alt=""><span><strong>{$work.display_name|escape:'html'}</strong><small>图片 ID {$work.id}</small></span></div></td>
+                <td class="gzca-select-col"><input type="checkbox" name="selected_images[]" value="{$work.id}" form="gzca-bulk-form" aria-label="选择 {$work.display_name|escape:'html'}" data-bulk-item></td>
+                <td><div class="gzca-work-cell"><img src="{$work.thumb_url|escape:'html'}" alt=""><span><strong>{$work.display_name|escape:'html'}</strong><small>图片 ID {$work.id} · 原图 {$work.filesize_label|escape:'html'}</small></span></div></td>
                 <td><code>{$work.code|escape:'html'}</code></td>
-                <td>{$work.category_name|escape:'html'}</td>
-                <td>{if $work.in_competition}<span class="gzca-status is-competition">{$work.competition_name|escape:'html'}</span>{else}<span class="gzca-muted-label">未加入</span>{/if}</td>
+                <td><div class="gzca-category-cell" title="{$work.category_display_name|escape:'html'}"><strong>{$work.category_board_name|escape:'html'}</strong><small>{$work.category_leaf_name|escape:'html'}</small></div></td>
                 <td><span class="gzca-status {if $work.status eq 'online'}is-online{else}is-offline{/if}">{if $work.status eq 'online'}已上架{else}已下架{/if}</span></td>
-                <td><div class="gzca-row-actions"><a href="{$GZCA_URLS.works|escape:'html'}&amp;edit={$work.id}#edit-work">编辑</a><form method="post" action="{$GZCA_URLS.works|escape:'html'}"><input type="hidden" name="pwg_token" value="{$GZCA_TOKEN|escape:'html'}"><input type="hidden" name="gzca_action" value="toggle_work"><input type="hidden" name="image_id" value="{$work.id}"><button type="submit">{if $work.status eq 'online'}下架{else}上架{/if}</button></form>{if $work.category_id}<form method="post" action="{$GZCA_URLS.works|escape:'html'}"><input type="hidden" name="pwg_token" value="{$GZCA_TOKEN|escape:'html'}"><input type="hidden" name="gzca_action" value="set_cover"><input type="hidden" name="image_id" value="{$work.id}"><input type="hidden" name="album_id" value="{$work.category_id}"><button type="submit">设为封面</button></form>{/if}</div></td>
+                <td><span class="gzca-status {if $work.is_public}is-online{else}is-offline{/if}">{if $work.is_public}公开{else}私密{/if}</span></td>
+                <td><span class="gzca-status {if $work.frontend_visible}is-online{else}is-offline{/if}">{if $work.frontend_visible}显示{else}不显示{/if}</span></td>
+                <td><div class="gzca-row-actions"><a href="{$GZCA_URLS.works|escape:'html'}&amp;edit={$work.id}#edit-work">编辑</a><form method="post" action="{$GZCA_URLS.works|escape:'html'}"><input type="hidden" name="pwg_token" value="{$GZCA_TOKEN|escape:'html'}"><input type="hidden" name="gzca_action" value="toggle_work"><input type="hidden" name="image_id" value="{$work.id}"><button type="submit">{if $work.status eq 'online'}下架{else}上架{/if}</button></form>{if $work.category_id}<form method="post" action="{$GZCA_URLS.works|escape:'html'}"><input type="hidden" name="pwg_token" value="{$GZCA_TOKEN|escape:'html'}"><input type="hidden" name="gzca_action" value="set_cover"><input type="hidden" name="image_id" value="{$work.id}"><input type="hidden" name="album_id" value="{$work.category_id}"><button type="submit">设为封面</button></form>{/if}<form method="post" action="{$GZCA_URLS.works|escape:'html'}"><input type="hidden" name="pwg_token" value="{$GZCA_TOKEN|escape:'html'}"><input type="hidden" name="gzca_action" value="download_work"><input type="hidden" name="image_id" value="{$work.id}"><button class="gzca-row-download" type="submit">下载原图</button></form><form method="post" action="{$GZCA_URLS.works|escape:'html'}" data-work-name="{$work.display_name|escape:'html'}"><input type="hidden" name="pwg_token" value="{$GZCA_TOKEN|escape:'html'}"><input type="hidden" name="gzca_action" value="delete_work"><input type="hidden" name="image_id" value="{$work.id}"><input type="hidden" name="delete_confirm" value=""><button class="gzca-row-delete" type="submit">删除</button></form></div></td>
               </tr>
             {foreachelse}
-              <tr><td colspan="6"><div class="gzca-empty"><strong>没有找到作品</strong><span>调整搜索条件，或者上传新的作品。</span></div></td></tr>
+              <tr><td colspan="8"><div class="gzca-empty"><strong>没有找到作品</strong><span>调整搜索条件，或者上传新的作品。</span></div></td></tr>
             {/foreach}
             </tbody>
           </table>
         </div>
 
-        <nav class="gzca-pager" aria-label="作品分页"><span>共 {$GZCA_PAGER.total} 张 · 第 {$GZCA_PAGER.page}/{$GZCA_PAGER.pages} 页</span><div>{if $GZCA_PAGER.previous_url}<a class="gzca-button gzca-button-quiet" href="{$GZCA_PAGER.previous_url|escape:'html'}">上一页</a>{/if}{if $GZCA_PAGER.next_url}<a class="gzca-button gzca-button-primary" href="{$GZCA_PAGER.next_url|escape:'html'}">下一页</a>{/if}</div></nav>
+        <nav class="gzca-pager gzca-work-pager" aria-label="作品分页">
+          <span>共 {$GZCA_PAGER.total} 张 · 每页 {$GZCA_PAGER.per_page} 张 · 第 {$GZCA_PAGER.page}/{$GZCA_PAGER.pages} 页</span>
+          <div class="gzca-page-links">
+            {if $GZCA_PAGER.first_url}<a class="gzca-page-link is-nav" href="{$GZCA_PAGER.first_url|escape:'html'}">首页</a>{/if}
+            {if $GZCA_PAGER.previous_url}<a class="gzca-page-link is-nav" href="{$GZCA_PAGER.previous_url|escape:'html'}">上一页</a>{else}<span class="gzca-page-link is-nav is-disabled" aria-disabled="true">上一页</span>{/if}
+            {foreach from=$GZCA_PAGER.links item=link}{if $link.page eq 0}<span class="gzca-page-ellipsis">...</span>{elseif $link.current}<span class="gzca-page-link is-current" aria-current="page">{$link.label|escape:'html'}</span>{else}<a class="gzca-page-link" href="{$link.url|escape:'html'}">{$link.label|escape:'html'}</a>{/if}{/foreach}
+            {if $GZCA_PAGER.next_url}<a class="gzca-page-link is-nav" href="{$GZCA_PAGER.next_url|escape:'html'}">下一页</a>{else}<span class="gzca-page-link is-nav is-disabled" aria-disabled="true">下一页</span>{/if}
+            {if $GZCA_PAGER.last_url}<a class="gzca-page-link is-nav" href="{$GZCA_PAGER.last_url|escape:'html'}">末页</a>{/if}
+          </div>
+          <form class="gzca-page-jump" action="{$ROOT_URL}admin.php" method="get">
+            <input type="hidden" name="page" value="plugin-GuozhanClientAdmin"><input type="hidden" name="tab" value="works"><input type="hidden" name="q" value="{$GZCA_FILTERS.q|escape:'html'}"><input type="hidden" name="album_id" value="{$GZCA_FILTERS.album_id}"><input type="hidden" name="status" value="{$GZCA_FILTERS.status|escape:'html'}"><input type="hidden" name="visibility" value="{$GZCA_FILTERS.visibility|escape:'html'}"><input type="hidden" name="per_page" value="{$GZCA_FILTERS.per_page}">
+            <label><span>跳到</span><input type="number" name="p" min="1" max="{$GZCA_PAGER.pages}" value="{$GZCA_PAGER.page}"></label><button class="gzca-button gzca-button-quiet" type="submit">跳转</button>
+          </form>
+        </nav>
       </section>
     {/if}
 
@@ -227,58 +295,59 @@
             <label class="gzca-check"><input type="checkbox" name="reserved" value="1" {if $GZCA_EDIT_CATEGORY and $GZCA_EDIT_CATEGORY.reserved}checked{/if}><span><strong>标记为预留画展</strong><small>没有图片也会保留入口；确定正式展名后可取消勾选。</small></span></label>
             <button class="gzca-button gzca-button-primary gzca-button-block" type="submit">{if $GZCA_EDIT_CATEGORY}保存分类{else}创建分类{/if}</button>
           </form>
+          {if $GZCA_EDIT_CATEGORY}
+            <div class="gzca-danger-zone {if $GZCA_EDIT_CATEGORY.is_hidden}is-restore{/if}">
+              <strong>{if $GZCA_EDIT_CATEGORY.is_hidden}显示板块{else}隐藏板块{/if}</strong>
+              <p>{$GZCA_EDIT_CATEGORY.hide_note|escape:'html'}</p>
+              <form method="post" action="{$GZCA_URLS.categories|escape:'html'}" data-category-name="{$GZCA_EDIT_CATEGORY.name|escape:'html'}">
+                <input type="hidden" name="pwg_token" value="{$GZCA_TOKEN|escape:'html'}"><input type="hidden" name="gzca_action" value="{if $GZCA_EDIT_CATEGORY.is_hidden}show_category{else}hide_category{/if}"><input type="hidden" name="category_id" value="{$GZCA_EDIT_CATEGORY.id}">
+                <button class="gzca-button {if $GZCA_EDIT_CATEGORY.is_hidden}gzca-button-restore{else}gzca-button-warn{/if} gzca-button-block" type="submit">{if $GZCA_EDIT_CATEGORY.is_hidden}显示这个板块{else}隐藏这个板块{/if}</button>
+              </form>
+            </div>
+            <div class="gzca-danger-zone is-permanent">
+              <strong>永久删除板块</strong>
+              <p>{$GZCA_EDIT_CATEGORY.delete_note|escape:'html'}此操作不可恢复；如只是暂时不展示，请使用上面的“隐藏”。</p>
+              <form method="post" action="{$GZCA_URLS.categories|escape:'html'}" data-category-name="{$GZCA_EDIT_CATEGORY.name|escape:'html'}">
+                <input type="hidden" name="pwg_token" value="{$GZCA_TOKEN|escape:'html'}"><input type="hidden" name="gzca_action" value="delete_category"><input type="hidden" name="category_id" value="{$GZCA_EDIT_CATEGORY.id}"><input type="hidden" name="delete_confirm" value="">
+                <button class="gzca-button gzca-button-danger gzca-button-block" type="submit">永久删除这个板块</button>
+              </form>
+            </div>
+          {/if}
         </section>
 
-        <section class="gzca-panel">
+        <section class="gzca-panel gzca-category-list-panel" data-category-browser>
           <div class="gzca-panel-head"><div><p>前台板块</p><h3>分类与专项画展</h3></div><span class="gzca-help">{$GZCA_STATS.categories} 个大板块</span></div>
-          <div class="gzca-category-groups">
+          <div class="gzca-category-toolbar">
+            <label class="gzca-field gzca-category-filter-field"><span>按分类选择</span><select data-category-filter><option value="all">全部板块</option><option value="kind-catalog">作品分类</option><option value="kind-exhibition">专项画展</option><option value="hidden">已隐藏板块</option>{foreach from=$GZCA_CATEGORY_GROUPS item=group}<option value="group-{$group.id}">{$group.name|escape:'html'}</option>{/foreach}</select></label>
+            <label class="gzca-field gzca-category-filter-field"><span>每页显示</span><select data-category-per-page><option value="4" selected>每页 4 组</option><option value="6">每页 6 组</option><option value="10">每页 10 组</option></select></label>
+          </div>
+          <nav class="gzca-category-pager" aria-label="分类分页">
+            <span data-category-page-summary>正在整理板块</span>
+            <div><button class="gzca-button gzca-button-quiet" type="button" data-category-prev>上一页</button><span data-category-page-label>第 1 / 1 页</span><button class="gzca-button gzca-button-quiet" type="button" data-category-next>下一页</button></div>
+          </nav>
+          <div class="gzca-category-groups" data-category-groups>
           {foreach from=$GZCA_CATEGORY_GROUPS item=group}
-            <section class="gzca-category-group {if $group.category_kind eq 'exhibition'}is-exhibition{/if}">
+            <section class="gzca-category-group {if $group.category_kind eq 'exhibition'}is-exhibition{/if}" data-category-card data-category-id="{$group.id}" data-category-kind="{$group.category_kind|escape:'html'}" data-category-hidden="{if $group.is_hidden}1{else}0{/if}">
               <article class="gzca-category-parent">
                 <div><span class="gzca-category-level">{if $group.category_kind eq 'exhibition'}展览总目录{elseif $group.child_count eq 0 and $group.direct_upload}直接分类{else}大分类{/if}</span><strong>{$group.name|escape:'html'}</strong><small>{$group.code_prefix|default:'未设置前缀'|escape:'html'} · {$group.image_count} 张作品 · {$group.child_count} 个子板块{if $group.direct_upload} · 可直接上传{/if}</small></div>
-                <span class="gzca-status {if $group.visible eq 'true'}is-online{else}is-offline{/if}">{if $group.visible eq 'true'}显示中{else}已隐藏{/if}</span>
-                <a class="gzca-button gzca-button-quiet" href="{$GZCA_URLS.categories|escape:'html'}&amp;edit={$group.id}">编辑</a>
+                <span class="gzca-status {if $group.is_hidden}is-offline{elseif $group.visible eq 'true'}is-online{else}is-offline{/if}">{if $group.is_hidden}已隐藏{elseif $group.visible eq 'true'}显示中{else}已隐藏{/if}</span>
+                <div class="gzca-category-actions"><a class="gzca-button gzca-button-quiet" href="{$GZCA_URLS.categories|escape:'html'}&amp;edit={$group.id}">编辑</a><form method="post" action="{$GZCA_URLS.categories|escape:'html'}" data-category-name="{$group.name|escape:'html'}"><input type="hidden" name="pwg_token" value="{$GZCA_TOKEN|escape:'html'}"><input type="hidden" name="gzca_action" value="{if $group.is_hidden}show_category{else}hide_category{/if}"><input type="hidden" name="category_id" value="{$group.id}"><button class="gzca-button {if $group.is_hidden}gzca-button-restore{else}gzca-button-warn{/if}" type="submit">{if $group.is_hidden}显示{else}隐藏{/if}</button></form><form method="post" action="{$GZCA_URLS.categories|escape:'html'}" data-category-name="{$group.name|escape:'html'}"><input type="hidden" name="pwg_token" value="{$GZCA_TOKEN|escape:'html'}"><input type="hidden" name="gzca_action" value="delete_category"><input type="hidden" name="category_id" value="{$group.id}"><input type="hidden" name="delete_confirm" value=""><button class="gzca-button gzca-button-danger" type="submit">删除</button></form></div>
               </article>
               {if $group.child_count gt 0}<div class="gzca-category-children">
                 {foreach from=$group.children item=category}<article>
                   <div><span class="gzca-category-level">{if $category.reserved}预留画展{elseif $category.category_kind eq 'exhibition'}专项画展{else}小分类{/if}</span><strong>{$category.name|escape:'html'}</strong><small>{$category.code_prefix|default:'未设置前缀'|escape:'html'} · {$category.image_count} 张作品{if $category.direct_upload} · 可直接上传{/if}</small></div>
-                  <span class="gzca-status {if $category.visible eq 'true'}is-online{else}is-offline{/if}">{if $category.visible eq 'true'}显示中{else}已隐藏{/if}</span>
-                  <a class="gzca-button gzca-button-quiet" href="{$GZCA_URLS.categories|escape:'html'}&amp;edit={$category.id}">编辑</a>
+                  <span class="gzca-status {if $category.is_hidden}is-offline{elseif $category.visible eq 'true'}is-online{else}is-offline{/if}">{if $category.is_hidden}已隐藏{elseif $category.visible eq 'true'}显示中{else}已隐藏{/if}</span>
+                  <div class="gzca-category-actions"><a class="gzca-button gzca-button-quiet" href="{$GZCA_URLS.categories|escape:'html'}&amp;edit={$category.id}">编辑</a><form method="post" action="{$GZCA_URLS.categories|escape:'html'}" data-category-name="{$category.name|escape:'html'}"><input type="hidden" name="pwg_token" value="{$GZCA_TOKEN|escape:'html'}"><input type="hidden" name="gzca_action" value="{if $category.is_hidden}show_category{else}hide_category{/if}"><input type="hidden" name="category_id" value="{$category.id}"><button class="gzca-button {if $category.is_hidden}gzca-button-restore{else}gzca-button-warn{/if}" type="submit">{if $category.is_hidden}显示{else}隐藏{/if}</button></form><form method="post" action="{$GZCA_URLS.categories|escape:'html'}" data-category-name="{$category.name|escape:'html'}"><input type="hidden" name="pwg_token" value="{$GZCA_TOKEN|escape:'html'}"><input type="hidden" name="gzca_action" value="delete_category"><input type="hidden" name="category_id" value="{$category.id}"><input type="hidden" name="delete_confirm" value=""><button class="gzca-button gzca-button-danger" type="submit">删除</button></form></div>
                 </article>{/foreach}
               </div>{/if}
             </section>
           {foreachelse}<div class="gzca-empty"><strong>还没有前台板块</strong><span>点击“建立前端对应分类”，或从左侧创建第一个大板块。</span></div>{/foreach}
           </div>
-        </section>
-      </div>
-    {/if}
-
-    {if $GZCA_TAB eq 'competition'}
-      <div class="gzca-category-layout">
-        <section class="gzca-panel gzca-category-form-panel">
-          <div class="gzca-panel-head"><div><p>{if $GZCA_EDIT_COMPETITION_MEDIUM}编辑类型{else}新增类型{/if}</p><h3>{if $GZCA_EDIT_COMPETITION_MEDIUM}{$GZCA_EDIT_COMPETITION_MEDIUM.name|escape:'html'}{else}设置比赛分类{/if}</h3></div>{if $GZCA_EDIT_COMPETITION_MEDIUM}<a class="gzca-text-link" href="{$GZCA_URLS.competition|escape:'html'}">取消编辑</a>{/if}</div>
-          <form class="gzca-stack-form" action="{$GZCA_URLS.competition|escape:'html'}" method="post">
-            <input type="hidden" name="pwg_token" value="{$GZCA_TOKEN|escape:'html'}"><input type="hidden" name="gzca_action" value="save_competition_medium">{if $GZCA_EDIT_COMPETITION_MEDIUM}<input type="hidden" name="medium_id" value="{$GZCA_EDIT_COMPETITION_MEDIUM.id}">{/if}
-            <label class="gzca-field"><span>比赛类型名称</span><input type="text" name="name" value="{if $GZCA_EDIT_COMPETITION_MEDIUM}{$GZCA_EDIT_COMPETITION_MEDIUM.name|escape:'html'}{/if}" placeholder="例如 水墨" required></label>
-            <label class="gzca-field"><span>英文标识</span><input type="text" name="slug" value="{if $GZCA_EDIT_COMPETITION_MEDIUM}{$GZCA_EDIT_COMPETITION_MEDIUM.slug|escape:'html'}{/if}" placeholder="例如 ink" pattern="[a-z0-9]+(?:-[a-z0-9]+)*" required><small>前台筛选链接使用，只能填写小写字母、数字和短横线。</small></label>
-            <label class="gzca-field"><span>比赛说明</span><textarea name="description" rows="4" placeholder="例如 水墨类比赛作品">{if $GZCA_EDIT_COMPETITION_MEDIUM}{$GZCA_EDIT_COMPETITION_MEDIUM.description|escape:'html'}{/if}</textarea></label>
-            <label class="gzca-field"><span>排序数字</span><input type="number" name="sort_order" value="{if $GZCA_EDIT_COMPETITION_MEDIUM}{$GZCA_EDIT_COMPETITION_MEDIUM.sort_order}{else}0{/if}" min="0"><small>数字越小越靠前。</small></label>
-            <label class="gzca-field"><span>状态</span><select name="status"><option value="active" {if !$GZCA_EDIT_COMPETITION_MEDIUM or $GZCA_EDIT_COMPETITION_MEDIUM.status eq 'active'}selected{/if}>启用</option><option value="inactive" {if $GZCA_EDIT_COMPETITION_MEDIUM and $GZCA_EDIT_COMPETITION_MEDIUM.status eq 'inactive'}selected{/if}>停用</option></select></label>
-            <button class="gzca-button gzca-button-primary gzca-button-block" type="submit">保存比赛类型</button>
-          </form>
-        </section>
-
-        <section class="gzca-panel">
-          <div class="gzca-panel-head"><div><p>前台筛选</p><h3>比赛类型</h3></div><span class="gzca-help">共 {count($GZCA_COMPETITION_MEDIA)} 类</span></div>
-          <div class="gzca-category-list">
-          {foreach from=$GZCA_COMPETITION_MEDIA item=medium}
-            <article>
-              <div><span class="gzca-category-level">比赛</span><strong>{$medium.name|escape:'html'}</strong><small>{$medium.slug|escape:'html'} · {$medium.work_count} 张已上架作品{if $medium.description} · {$medium.description|escape:'html'}{/if}</small></div>
-              <span class="gzca-status {if $medium.status eq 'active'}is-online{else}is-offline{/if}">{if $medium.status eq 'active'}使用中{else}已停用{/if}</span>
-              <a class="gzca-button gzca-button-quiet" href="{$GZCA_URLS.competition|escape:'html'}&amp;edit={$medium.id}">编辑</a>
-            </article>
-          {foreachelse}<div class="gzca-empty"><strong>还没有比赛类型</strong><span>从左侧新增第一个比赛类型。</span></div>{/foreach}
-          </div>
+          <div class="gzca-empty gzca-category-filter-empty" data-category-empty hidden><strong>没有匹配的板块</strong><span>换一个分类筛选条件，或先创建新的板块。</span></div>
+          <nav class="gzca-category-pager gzca-category-pager-bottom" aria-label="分类分页">
+            <span data-category-page-summary>正在整理板块</span>
+            <div><button class="gzca-button gzca-button-quiet" type="button" data-category-prev>上一页</button><span data-category-page-label>第 1 / 1 页</span><button class="gzca-button gzca-button-quiet" type="button" data-category-next>下一页</button></div>
+          </nav>
         </section>
       </div>
     {/if}
@@ -291,20 +360,36 @@
           <div class="gzca-contact-fields">
             <label class="gzca-field"><span>展示馆名称</span><input type="text" name="brand_name" value="{$GZCA_CONFIG.brand_name|escape:'html'}" required></label>
             <label class="gzca-field"><span>英文名称</span><input type="text" name="brand_en" value="{$GZCA_CONFIG.brand_en|escape:'html'}" placeholder="AI Graphics Learning Plan"></label>
-            <label class="gzca-field"><span>客服微信号</span><input type="text" name="wechat" value="{$GZCA_CONFIG.wechat|escape:'html'}" required></label>
             <label class="gzca-field"><span>联系电话</span><input type="text" name="phone" value="{$GZCA_CONFIG.phone|escape:'html'}" placeholder="可不填写"></label>
-            <label class="gzca-field"><span>联系说明</span><textarea name="contact_note" rows="5">{$GZCA_CONFIG.contact_note|escape:'html'}</textarea></label>
-            <label class="gzca-check"><input type="checkbox" name="frontend_sync" value="1" {if $GZCA_CONFIG.frontend_sync}checked{/if}><span><strong>同步到网站客服弹窗</strong><small>会替换前台显示的微信号、说明和二维码。</small></span></label>
-            {if $GZCA_IS_WEBMASTER}<div class="gzca-info-line"><strong>后台入口</strong><small>所有后台访问默认展示国展定制后台，原生 Piwigo 后台已隐藏。</small></div>{/if}
+            <label class="gzca-check"><input type="checkbox" name="frontend_sync" value="1" {if $GZCA_CONFIG.frontend_sync}checked{/if}><span><strong>同步到网站客服区域</strong><small>会同步前台联系客服页、客服弹窗里的两个微信号、说明和二维码。</small></span></label>
+          </div>
+
+          <div class="gzca-contact-admin-grid">
+            {foreach from=$GZCA_CONTACTS item=contact}
+              <article class="gzca-contact-card">
+                <div class="gzca-contact-card-head">
+                  <div><p>客服 {$contact.slot}</p><h4>{$contact.label|escape:'html'}</h4></div>
+                  <label class="gzca-switch"><input type="checkbox" name="contacts[{$contact.index}][enabled]" value="1" {if $contact.enabled}checked{/if} {if $contact.slot eq 1}disabled{/if}><span>{if $contact.slot eq 1}默认启用{else}启用{/if}</span></label>
+                  {if $contact.slot eq 1}<input type="hidden" name="contacts[{$contact.index}][enabled]" value="1">{/if}
+                </div>
+                <div class="gzca-contact-card-body">
+                  <div class="gzca-qr-preview gzca-contact-qr-preview">{if $contact.qr_url}<img src="{$contact.qr_url|escape:'html'}" alt="客服 {$contact.slot} 二维码">{else}<span>客服 {$contact.slot}<br>二维码</span>{/if}</div>
+                  <div class="gzca-contact-card-fields">
+                    <label class="gzca-field"><span>显示名称</span><input type="text" name="contacts[{$contact.index}][label]" value="{$contact.label|escape:'html'}" required></label>
+                    <label class="gzca-field"><span>微信号</span><input type="text" name="contacts[{$contact.index}][wechat]" value="{$contact.wechat|escape:'html'}" {if $contact.slot eq 1}required{/if}></label>
+                    <label class="gzca-field"><span>联系说明</span><textarea name="contacts[{$contact.index}][note]" rows="3">{$contact.note|escape:'html'}</textarea></label>
+                    <label class="gzca-field"><span>更换客服 {$contact.slot} 二维码</span><input type="file" name="contact_qr_{$contact.slot}" accept="image/jpeg,image/png,image/webp"><small>支持 JPG、PNG、WebP，最大 2MB。</small></label>
+                  </div>
+                </div>
+              </article>
+            {/foreach}
           </div>
         </section>
         <aside class="gzca-panel gzca-qr-panel">
           <div class="gzca-panel-head"><div><p>网站标识</p><h3>公司 Logo</h3></div></div>
           <div class="gzca-qr-preview gzca-logo-preview">{if $GZCA_LOGO_URL}<img src="{$GZCA_LOGO_URL|escape:'html'}" alt="当前公司 Logo">{else}<span>图</span>{/if}</div>
           <label class="gzca-field"><span>更换 Logo</span><input type="file" name="brand_logo" accept="image/jpeg,image/png,image/webp"><small>建议透明 PNG 或 WebP，最大 4MB。</small></label>
-          <div class="gzca-panel-head"><div><p>扫码联系</p><h3>客服二维码</h3></div></div>
-          <div class="gzca-qr-preview">{if $GZCA_QR_URL}<img src="{$GZCA_QR_URL|escape:'html'}" alt="当前客服二维码">{else}<span>二维码占位</span>{/if}</div>
-          <label class="gzca-field"><span>更换二维码</span><input type="file" name="contact_qr" accept="image/jpeg,image/png,image/webp"><small>支持 JPG、PNG、WebP，最大 2MB。</small></label>
+          <div class="gzca-side-note"><strong>客服显示规则</strong><span>前台最多显示两个已启用客服。客服1作为默认客服保留，客服2开启后会在二维码区并列展示。</span></div>
           <button class="gzca-button gzca-button-primary gzca-button-block" type="submit">保存客服信息</button>
         </aside>
       </form>

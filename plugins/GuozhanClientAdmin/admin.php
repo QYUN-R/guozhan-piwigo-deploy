@@ -7,7 +7,7 @@ include_once(PHPWG_ROOT_PATH.'admin/include/functions.php');
 
 global $conf, $page, $template, $user;
 
-$allowed_tabs = array('dashboard', 'upload', 'works', 'categories', 'competition', 'contact');
+$allowed_tabs = array('dashboard', 'home', 'upload', 'works', 'categories', 'contact');
 $tab = isset($_GET['tab']) ? $_GET['tab'] : 'dashboard';
 if (!in_array($tab, $allowed_tabs, true))
 {
@@ -18,6 +18,38 @@ $action = isset($_POST['gzca_action']) ? $_POST['gzca_action'] : '';
 if (!empty($action))
 {
   check_pwg_token();
+}
+
+if ('download_work' === $action)
+{
+  $image_id = isset($_POST['image_id']) ? (int)$_POST['image_id'] : 0;
+  $download_error = '';
+  if (!gzca_stream_admin_work_download($image_id, $download_error))
+  {
+    $page['errors'][] = $download_error ?: '原图下载失败，请确认作品仍然存在。';
+  }
+}
+
+if (!function_exists('gzca_selected_image_ids_from_post'))
+{
+  function gzca_selected_image_ids_from_post($key='selected_images')
+  {
+    $raw = isset($_POST[$key]) ? $_POST[$key] : array();
+    if (!is_array($raw))
+    {
+      $raw = array($raw);
+    }
+    $ids = array();
+    foreach ($raw as $id)
+    {
+      $id = (int)$id;
+      if ($id > 0)
+      {
+        $ids[$id] = $id;
+      }
+    }
+    return array_values($ids);
+  }
 }
 
 if ('seed_categories' === $action)
@@ -34,7 +66,7 @@ if ('import_sample_works' === $action)
   $result = gzca_import_sample_works($sample_errors);
   if ($result['created'] > 0)
   {
-    $page['infos'][] = '已导入 '.$result['created'].' 张本地样例作品，可直接在前台检查作品列表、详情和比赛筛选。';
+    $page['infos'][] = '已导入 '.$result['created'].' 张本地样例作品，可直接在前台检查作品列表和详情。';
   }
   if ($result['skipped'] > 0)
   {
@@ -49,102 +81,47 @@ if ('import_sample_works' === $action)
 if ('upload_works' === $action)
 {
   $album_id = isset($_POST['album_id']) ? (int)$_POST['album_id'] : 0;
-  $prefix = gzca_category_prefix($album_id);
-  $publish_now = isset($_POST['publish_now']);
+  $publish_now = isset($_POST['publish_now']) && '1' === (string)$_POST['publish_now'];
   $set_cover = isset($_POST['set_cover']);
-  $competition_medium_id = isset($_POST['competition_medium_id']) ? (int)$_POST['competition_medium_id'] : 0;
   $uploads = gzca_normalize_uploads(isset($_FILES['artworks']) ? $_FILES['artworks'] : array());
+  $async_upload = isset($_POST['gzca_async']) && '1' === (string)$_POST['gzca_async'];
 
-  if (!gzca_category_is_upload_target($album_id))
-  {
-    $page['errors'][] = '请选择可以直接上传作品的前台板块、分类或画展。';
-  }
-  elseif (!gzca_valid_prefix($prefix))
-  {
-    $page['errors'][] = '所选分类尚未设置有效编号前缀，请先到分类管理中完善。';
-  }
-  elseif ($competition_medium_id > 0 && !gzca_competition_medium_exists($competition_medium_id, true))
-  {
-    $page['errors'][] = '所选比赛类型不存在或已停用。';
-  }
-  elseif (empty($uploads))
-  {
-    $page['errors'][] = '请至少选择一张作品图片。';
-  }
-  elseif (count($uploads) > 20)
-  {
-    $page['errors'][] = '一次最多上传 20 张图片，请分批上传。当前选择了 '.count($uploads).' 张。';
-  }
-  else
-  {
-    include_once(PHPWG_ROOT_PATH.'admin/include/functions_upload.inc.php');
+  $upload_errors = array();
+  $upload_result = gzca_upload_works_batch($album_id, $uploads, $publish_now, $set_cover, $upload_errors);
 
-    $uploaded_ids = array();
-    $uploaded_codes = array();
-    foreach ($uploads as $file)
+  if ($async_upload)
+  {
+    if (function_exists('ob_get_level'))
     {
-      if (UPLOAD_ERR_OK !== $file['error'])
+      while (ob_get_level() > 0)
       {
-        $page['errors'][] = '文件“'.htmlspecialchars($file['name']).'”上传失败，错误代码 '.$file['error'].'。';
-        continue;
+        ob_end_clean();
       }
-
-      $extension = strtolower(get_extension($file['name']));
-      if (!in_array($extension, $conf['picture_ext'], true) || false === @getimagesize($file['tmp_name']))
-      {
-        $page['errors'][] = '文件“'.htmlspecialchars($file['name']).'”不是受支持的图片。';
-        continue;
-      }
-
-      $image_id = add_uploaded_file(
-        $file['tmp_name'],
-        $file['name'],
-        array($album_id),
-        $publish_now ? 0 : 8
-        );
-
-      if (empty($image_id))
-      {
-        $page['errors'][] = '文件“'.htmlspecialchars($file['name']).'”未能写入图库。';
-        continue;
-      }
-
-      $existing_meta = pwg_db_num_rows(pwg_query(
-        'SELECT image_id FROM '.GZCA_WORKS_TABLE.' WHERE image_id = '.(int)$image_id.';'
-        )) > 0;
-      if (!$existing_meta)
-      {
-        $code = gzca_next_code($prefix);
-        $title = gzca_clean_text(pathinfo($file['name'], PATHINFO_FILENAME), 255);
-        single_update(
-          IMAGES_TABLE,
-          array(
-            'name' => $title,
-            'comment' => gzca_embed_code('', $code),
-            'level' => $publish_now ? 0 : 8,
-            ),
-          array('id' => (int)$image_id)
-        );
-        gzca_save_work_meta($image_id, $code, $publish_now ? 'online' : 'offline', 0, 0, 0, $competition_medium_id);
-        $uploaded_codes[] = $code;
-      }
-
-      $uploaded_ids[] = (int)$image_id;
     }
+    header('Content-Type: application/json; charset=utf-8');
+    echo json_encode(array(
+      'ok' => empty($upload_errors) && $upload_result['uploaded'] > 0,
+      'uploaded' => $upload_result['uploaded'],
+      'codes' => $upload_result['uploaded_codes'],
+      'message' => $upload_result['message'],
+      'compressed_count' => $upload_result['compressed_count'],
+      'compressed_saved' => gzca_format_bytes($upload_result['compressed_saved_bytes']),
+      'errors' => $upload_errors,
+      ), JSON_UNESCAPED_UNICODE);
+    exit;
+  }
 
-    if (!empty($uploaded_ids))
+  foreach ($upload_errors as $upload_error)
+  {
+    $page['errors'][] = $upload_error;
+  }
+
+  if ($upload_result['uploaded'] > 0)
+  {
+    $page['infos'][] = htmlspecialchars($upload_result['message'], ENT_QUOTES, 'UTF-8');
+    if ($upload_result['compressed_count'] > 0)
     {
-      if ($set_cover)
-      {
-        gzca_set_category_cover($album_id, $uploaded_ids[0]);
-      }
-      update_category($album_id);
-      invalidate_user_cache();
-      $category_path = htmlspecialchars(gzca_category_path($album_id), ENT_QUOTES, 'UTF-8');
-      $code_summary = empty($uploaded_codes)
-        ? ''
-        : '，编号 '.reset($uploaded_codes).(count($uploaded_codes) > 1 ? ' 至 '.end($uploaded_codes) : '');
-      $page['infos'][] = '已上传 '.count($uploaded_ids).' 张作品到“'.$category_path.'”'.$code_summary.'。';
+      $page['infos'][] = '已自动压缩 '.$upload_result['compressed_count'].' 张新上传图片，目标控制在约 1-3MB，节省约 '.gzca_format_bytes($upload_result['compressed_saved_bytes']).' 存储空间。';
     }
   }
 }
@@ -157,11 +134,10 @@ if ('save_work' === $action)
   $code = gzca_normalize_code(isset($_POST['code']) ? $_POST['code'] : '');
   $description = gzca_clean_text(isset($_POST['description']) ? $_POST['description'] : '', 5000);
   $status = isset($_POST['status']) && 'offline' === $_POST['status'] ? 'offline' : 'online';
+  $visibility = isset($_POST['visibility']) && 'private' === $_POST['visibility'] ? 'private' : 'public';
   $featured = isset($_POST['featured']) ? 1 : 0;
   $sort_order = isset($_POST['sort_order']) ? (int)$_POST['sort_order'] : 0;
   $download_count = isset($_POST['download_count']) ? max(0, (int)$_POST['download_count']) : 0;
-  $competition_medium_id = isset($_POST['competition_medium_id']) ? (int)$_POST['competition_medium_id'] : 0;
-  $competition_sort_order = isset($_POST['competition_sort_order']) ? max(0, (int)$_POST['competition_sort_order']) : 0;
 
   if (null === gzca_find_image($image_id))
   {
@@ -183,10 +159,6 @@ if ('save_work' === $action)
   {
     $page['errors'][] = '作品编号“'.$code.'”已经存在，请换一个编号。';
   }
-  elseif ($competition_medium_id > 0 && !gzca_competition_medium_exists($competition_medium_id))
-  {
-    $page['errors'][] = '所选比赛类型不存在。';
-  }
   else
   {
     single_update(
@@ -194,20 +166,26 @@ if ('save_work' === $action)
       array(
         'name' => $title,
         'comment' => gzca_embed_code($description, $code),
-        'level' => 'online' === $status ? 0 : 8,
+        'level' => 'public' === $visibility ? 0 : 8,
         ),
       array('id' => $image_id)
       );
 
-    move_images_to_categories(array($image_id), array($album_id));
-    gzca_save_work_meta($image_id, $code, $status, $featured, $sort_order, $download_count, $competition_medium_id, $competition_sort_order);
+    $sync_result = gzca_sync_images_to_single_category(array($image_id), $album_id);
+    gzca_save_work_meta($image_id, $code, $status, $featured, $sort_order, $download_count);
 
     if (isset($_POST['set_cover']))
     {
       gzca_set_category_cover($album_id, $image_id);
     }
 
-    update_category($album_id);
+    foreach (array_unique(array_merge(isset($sync_result['old_category_ids']) ? $sync_result['old_category_ids'] : array(), array($album_id))) as $changed_category_id)
+    {
+      if ((int)$changed_category_id > 0)
+      {
+        update_category((int)$changed_category_id);
+      }
+    }
     invalidate_user_cache();
     pwg_activity('photo', $image_id, 'edit', array('fields' => 'gzca_client_admin'));
     $page['infos'][] = '作品“'.$title.'”已保存。';
@@ -226,9 +204,106 @@ if ('toggle_work' === $action)
   {
     $status = 'online' === $work['status'] ? 'offline' : 'online';
     single_update(IMAGES_TABLE, array('level' => 'online' === $status ? 0 : 8), array('id' => $image_id));
-    gzca_save_work_meta($image_id, $work['code'], $status, $work['featured'], $work['sort_order'], $work['download_count'], $work['competition_medium_id'], $work['competition_sort_order']);
+    gzca_save_work_meta($image_id, $work['code'], $status, $work['featured'], $work['sort_order'], $work['download_count']);
     invalidate_user_cache();
     $page['infos'][] = '作品已'.('online' === $status ? '上架' : '下架').'。';
+  }
+}
+
+if ('delete_work' === $action)
+{
+  $image_id = isset($_POST['image_id']) ? (int)$_POST['image_id'] : 0;
+  $delete_confirm = isset($_POST['delete_confirm']) ? trim($_POST['delete_confirm']) : '';
+  $delete_error = '';
+
+  if ('永久删除作品' !== $delete_confirm)
+  {
+    $page['errors'][] = '永久删除作品需要确认，本次没有执行删除。';
+  }
+  else
+  {
+    $deleted_count = gzca_delete_works(array($image_id), $delete_error);
+    if (false !== $deleted_count && $deleted_count > 0)
+    {
+      $page['infos'][] = '作品已永久删除：原图、缩略图/缓存图、数据库记录已清理。';
+    }
+    else
+    {
+      $page['errors'][] = $delete_error ?: '永久删除作品失败，未找到可删除的作品。';
+    }
+  }
+}
+
+if ('bulk_works' === $action)
+{
+  $selected_ids = gzca_selected_image_ids_from_post();
+  $bulk_action = isset($_POST['bulk_action']) ? $_POST['bulk_action'] : '';
+  $bulk_album_id = isset($_POST['bulk_album_id']) ? (int)$_POST['bulk_album_id'] : 0;
+  $bulk_delete_confirm = isset($_POST['bulk_delete_confirm']) ? trim($_POST['bulk_delete_confirm']) : '';
+
+  if (empty($selected_ids))
+  {
+    $page['errors'][] = '请先勾选要批量处理的作品。';
+  }
+  elseif (count($selected_ids) > 500)
+  {
+    $page['errors'][] = '一次最多批量处理 500 张作品，请缩小筛选范围后分批操作。';
+  }
+  elseif (!in_array($bulk_action, array('online', 'offline', 'move', 'delete'), true))
+  {
+    $page['errors'][] = '请选择要执行的批量操作。';
+  }
+  elseif ('move' === $bulk_action && !gzca_category_is_upload_target($bulk_album_id))
+  {
+    $page['errors'][] = '请选择可以放置作品的目标板块。';
+  }
+  elseif ('delete' === $bulk_action && '永久删除作品' !== $bulk_delete_confirm)
+  {
+    $page['errors'][] = '批量永久删除作品需要确认，本次没有执行删除。';
+  }
+  else
+  {
+    $changed = 0;
+    if ('online' === $bulk_action || 'offline' === $bulk_action)
+    {
+      foreach ($selected_ids as $image_id)
+      {
+        $work = gzca_find_image($image_id);
+        if (null === $work)
+        {
+          continue;
+        }
+        single_update(IMAGES_TABLE, array('level' => 'online' === $bulk_action ? 0 : 8), array('id' => $image_id));
+        gzca_save_work_meta($image_id, $work['code'], $bulk_action, $work['featured'], $work['sort_order'], $work['download_count']);
+        $changed++;
+      }
+      if ($changed > 0)
+      {
+        invalidate_user_cache();
+      }
+      $page['infos'][] = 'online' === $bulk_action
+        ? '已批量上架 '.$changed.' 张作品。'
+        : '已批量下架 '.$changed.' 张作品。';
+    }
+    elseif ('move' === $bulk_action)
+    {
+      $sync_result = gzca_sync_images_to_single_category($selected_ids, $bulk_album_id);
+      $changed = count($selected_ids);
+      $page['infos'][] = '已批量移动 '.$changed.' 张作品到“'.htmlspecialchars(gzca_category_path($bulk_album_id), ENT_QUOTES, 'UTF-8').'”。作品编号保持不变。';
+    }
+    elseif ('delete' === $bulk_action)
+    {
+      $delete_error = '';
+      $deleted_count = gzca_delete_works($selected_ids, $delete_error);
+      if (false !== $deleted_count)
+      {
+        $page['infos'][] = '已批量永久删除 '.$deleted_count.' 张作品：原图、缩略图/缓存图、数据库记录已清理。';
+      }
+      else
+      {
+        $page['errors'][] = $delete_error ?: '批量永久删除作品失败。';
+      }
+    }
   }
 }
 
@@ -244,6 +319,54 @@ if ('set_cover' === $action)
   else
   {
     $page['errors'][] = '设置封面失败，该作品不属于所选分类。';
+  }
+}
+
+if (in_array($action, array('hide_category', 'show_category'), true))
+{
+  $category_id = isset($_POST['category_id']) ? (int)$_POST['category_id'] : 0;
+  $hidden = 'hide_category' === $action;
+  $category_error = '';
+  if (gzca_set_category_hidden($category_id, $hidden, $category_error))
+  {
+    $page['infos'][] = $hidden
+      ? '板块已隐藏：前台不再显示，图片、作品记录和分类记录已保留。'
+      : '板块已显示：前台会重新展示，并允许上传。';
+  }
+  else
+  {
+    $page['errors'][] = $category_error ?: ($hidden ? '隐藏板块失败。' : '显示板块失败。');
+  }
+}
+
+if ('delete_category' === $action)
+{
+  $category_id = isset($_POST['category_id']) ? (int)$_POST['category_id'] : 0;
+  $delete_confirm = isset($_POST['delete_confirm']) ? trim($_POST['delete_confirm']) : '';
+  $category_error = '';
+  $delete_summary = array();
+  if ('永久删除' !== $delete_confirm)
+  {
+    $page['errors'][] = '永久删除需要输入确认文字“永久删除”，本次没有执行删除。';
+  }
+  else
+  {
+    $deleted_count = gzca_delete_category_tree($category_id, $category_error, $delete_summary);
+    if (false !== $deleted_count)
+    {
+      $deleted_images = isset($delete_summary['image_count']) ? (int)$delete_summary['image_count'] : 0;
+      $shared_images = isset($delete_summary['shared_image_count']) ? (int)$delete_summary['shared_image_count'] : 0;
+      $message = '板块已永久删除：共移除 '.$deleted_count.' 个分类节点，并删除 '.$deleted_images.' 张只属于该板块的作品图片文件、缩略图/缓存图和作品记录。';
+      if ($shared_images > 0)
+      {
+        $message .= ' 另有 '.$shared_images.' 张作品仍属于其他板块，本次只解除当前板块关联，已保留图片文件。';
+      }
+      $page['infos'][] = $message;
+    }
+    else
+    {
+      $page['errors'][] = $category_error ?: '永久删除板块失败。';
+    }
   }
 }
 
@@ -351,35 +474,56 @@ if ('save_category' === $action)
   }
 }
 
-if ('save_competition_medium' === $action)
+if ('save_home_hero' === $action)
 {
-  $medium_id = isset($_POST['medium_id']) ? (int)$_POST['medium_id'] : 0;
-  $name = gzca_clean_text(isset($_POST['name']) ? $_POST['name'] : '', 80);
-  $slug = strtolower(trim(isset($_POST['slug']) ? (string)$_POST['slug'] : ''));
-  $description = gzca_clean_text(isset($_POST['description']) ? $_POST['description'] : '', 500);
-  $sort_order = isset($_POST['sort_order']) ? max(0, (int)$_POST['sort_order']) : 0;
-  $status = isset($_POST['status']) && 'inactive' === $_POST['status'] ? 'inactive' : 'active';
+  $config = gzca_config();
+  $slides = gzca_normalize_hero_slides($config);
+  foreach ($slides as $index => $slide)
+  {
+    $slot = $index + 1;
+    $slide['enabled'] = isset($_POST['hero_enabled'][$index]);
+    $slide['title'] = gzca_clean_text(isset($_POST['hero_title'][$index]) ? $_POST['hero_title'][$index] : $slide['title'], 80);
+    $position = isset($_POST['hero_position'][$index]) ? $_POST['hero_position'][$index] : $slide['position'];
+    $allowed_positions = array('center', 'center top', 'center bottom', 'left center', 'right center');
+    $slide['position'] = in_array($position, $allowed_positions, true) ? $position : 'center';
 
-  if ('' === $name)
-  {
-    $page['errors'][] = '比赛类型名称不能为空。';
+    if (isset($_POST['hero_clear'][$index]))
+    {
+      $slide['image_path'] = !empty($slide['default_path']) ? $slide['default_path'] : '';
+      if (empty($slide['default_path']))
+      {
+        $slide['enabled'] = false;
+      }
+    }
+
+    $field = 'hero_image_'.$index;
+    $upload_error = '';
+    $uploaded_path = gzca_save_hero_slide_image(isset($_FILES[$field]) ? $_FILES[$field] : array(), $slot, $upload_error);
+    if (false === $uploaded_path)
+    {
+      $page['errors'][] = '轮播位 '.(int)$slot.'：'.$upload_error;
+    }
+    elseif (is_string($uploaded_path) && '' !== $uploaded_path)
+    {
+      $slide['image_path'] = $uploaded_path;
+      $slide['enabled'] = true;
+    }
+
+    $slides[$index] = array(
+      'index' => $index,
+      'enabled' => !empty($slide['enabled']),
+      'title' => $slide['title'],
+      'image_path' => $slide['image_path'],
+      'position' => $slide['position'],
+      );
   }
-  elseif (!gzca_valid_competition_slug($slug))
+
+  if (empty($page['errors']))
   {
-    $page['errors'][] = '比赛标识只能使用小写字母、数字和短横线，例如 ink、watercolor。';
-  }
-  elseif ($medium_id > 0 && !gzca_competition_medium_exists($medium_id))
-  {
-    $page['errors'][] = '比赛类型不存在或已被删除。';
-  }
-  elseif (gzca_competition_slug_exists($slug, $medium_id))
-  {
-    $page['errors'][] = '比赛标识“'.$slug.'”已存在。';
-  }
-  else
-  {
-    gzca_save_competition_medium($medium_id, $name, $slug, $description, $sort_order, $status);
-    $page['infos'][] = '比赛类型“'.$name.'”已保存。';
+    $config['hero_slides'] = $slides;
+    conf_update_param('gzca_config', $config, true, 'serialize');
+    $conf['gzca_config'] = $config;
+    $page['infos'][] = '首页轮播已保存，前台会自动同步新的轮播壁纸。';
   }
 }
 
@@ -388,51 +532,71 @@ if ('save_contact' === $action)
   $config = gzca_config();
   $config['brand_name'] = gzca_clean_text(isset($_POST['brand_name']) ? $_POST['brand_name'] : '', 120);
   $config['brand_en'] = gzca_clean_text(isset($_POST['brand_en']) ? $_POST['brand_en'] : '', 160);
-  $config['wechat'] = gzca_clean_text(isset($_POST['wechat']) ? $_POST['wechat'] : '', 120);
   $config['phone'] = gzca_clean_text(isset($_POST['phone']) ? $_POST['phone'] : '', 80);
-  $config['contact_note'] = gzca_clean_text(isset($_POST['contact_note']) ? $_POST['contact_note'] : '', 1000);
   $config['frontend_sync'] = isset($_POST['frontend_sync']);
   $config['restrict_administrators'] = true;
 
-  $qr_error = '';
-  $qr_path = gzca_save_contact_qr(isset($_FILES['contact_qr']) ? $_FILES['contact_qr'] : array(), $qr_error);
-  $logo_error = '';
-  $logo_path = gzca_save_logo(isset($_FILES['brand_logo']) ? $_FILES['brand_logo'] : array(), $logo_error);
-  if (false === $qr_path || false === $logo_path)
+  $contacts = gzca_normalize_contacts($config);
+  $posted_contacts = isset($_POST['contacts']) && is_array($_POST['contacts']) ? $_POST['contacts'] : array();
+  $has_error = false;
+  for ($slot = 1; $slot <= 2; $slot++)
   {
+    $index = $slot - 1;
+    $posted = isset($posted_contacts[$index]) && is_array($posted_contacts[$index]) ? $posted_contacts[$index] : array();
+    $contacts[$index]['label'] = gzca_clean_text(isset($posted['label']) ? $posted['label'] : '客服'.$slot, 60);
+    $contacts[$index]['wechat'] = gzca_clean_text(isset($posted['wechat']) ? $posted['wechat'] : '', 120);
+    $contacts[$index]['note'] = gzca_clean_text(isset($posted['note']) ? $posted['note'] : '', 1000);
+    $contacts[$index]['enabled'] = isset($posted['enabled']);
+    if (1 === $slot)
+    {
+      $contacts[$index]['enabled'] = true;
+    }
+    if ('' === $contacts[$index]['label'])
+    {
+      $contacts[$index]['label'] = '客服'.$slot;
+    }
+    $file_key = 'contact_qr_'.$slot;
+    $qr_error = '';
+    $qr_path = gzca_save_contact_qr(isset($_FILES[$file_key]) ? $_FILES[$file_key] : array(), $qr_error, $slot);
     if (false === $qr_path)
     {
       $page['errors'][] = $qr_error;
+      $has_error = true;
     }
-    if (false === $logo_path)
+    elseif (is_string($qr_path) && '' !== $qr_path)
     {
-      $page['errors'][] = $logo_error;
+      $contacts[$index]['qr_path'] = $qr_path;
     }
   }
-  else
+
+  $logo_error = '';
+  $logo_path = gzca_save_logo(isset($_FILES['brand_logo']) ? $_FILES['brand_logo'] : array(), $logo_error);
+  if (false === $logo_path)
   {
-    if (is_string($qr_path) && '' !== $qr_path)
-    {
-      $config['qr_path'] = $qr_path;
-    }
+    $page['errors'][] = $logo_error;
+    $has_error = true;
+  }
+
+  if (!$has_error)
+  {
     if (is_string($logo_path) && '' !== $logo_path)
     {
       $config['logo_path'] = $logo_path;
     }
+    $config['contacts'] = $contacts;
+    $config['wechat'] = $contacts[0]['wechat'];
+    $config['contact_note'] = $contacts[0]['note'];
+    $config['qr_path'] = $contacts[0]['qr_path'];
     conf_update_param('gzca_config', $config, true, 'serialize');
     $conf['gzca_config'] = $config;
-    $page['infos'][] = '客服信息已保存，并会同步到前台客服入口。';
+    $page['infos'][] = '客服信息已保存，两个客服会同步到前台客服入口。';
   }
 }
 
-$categories = gzca_get_categories(true);
+$categories = array_map('gzca_prepare_category_row', gzca_get_categories(true));
 $category_options = gzca_category_options($categories);
 $category_option_groups = gzca_category_option_groups($categories);
 $upload_target_count = count($category_options);
-$competition_media = gzca_get_competition_media(false);
-$active_competition_media = array_values(array_filter($competition_media, function ($item) {
-  return 'active' === $item['status'];
-}));
 $database_health = gzca_database_health();
 $sample_works_status = gzca_sample_works_status();
 
@@ -443,12 +607,6 @@ list($stats['offline']) = pwg_db_fetch_row(pwg_query('SELECT COUNT(*) FROM '.IMA
 $stats['categories'] = count(array_filter($categories, function ($category) {
   return empty($category['id_uppercat']);
 }));
-$stats['competition'] = 0;
-if (!empty($database_health['works_table']))
-{
-  list($stats['competition']) = pwg_db_fetch_row(pwg_query('SELECT COUNT(*) FROM '.GZCA_WORKS_TABLE.' WHERE competition_medium_id IS NOT NULL;'));
-}
-
 $recent_rows = !empty($database_health['works_table']) ? query2array('
 SELECT
     i.*,
@@ -457,15 +615,10 @@ SELECT
     gw.featured,
     gw.sort_order,
     gw.download_count,
-    gw.competition_medium_id,
-    gw.competition_sort_order,
-    gm.name AS competition_name,
-    gm.slug AS competition_slug,
     ic.category_id,
     c.name AS category_name
   FROM '.IMAGES_TABLE.' AS i
     LEFT JOIN '.GZCA_WORKS_TABLE.' AS gw ON gw.image_id = i.id
-    LEFT JOIN '.GZCA_COMPETITION_MEDIA_TABLE.' AS gm ON gm.id = gw.competition_medium_id
     LEFT JOIN '.IMAGE_CATEGORY_TABLE.' AS ic ON ic.image_id = i.id
       AND ic.category_id = (
         SELECT ic2.category_id
@@ -483,48 +636,57 @@ $recent_works = array_map('gzca_prepare_work_row', $recent_rows);
 
 $works = array();
 $pager = array('page' => 1, 'pages' => 1, 'total' => 0, 'previous_url' => '', 'next_url' => '');
-$filters = array('q' => '', 'status' => '', 'album_id' => 0, 'competition_medium_id' => 0);
+$filters = array('q' => '', 'status' => '', 'visibility' => '', 'album_id' => 0);
 if ('works' === $tab)
 {
   $query_text = isset($_GET['q']) ? gzca_clean_text($_GET['q'], 120) : '';
   $status_filter = isset($_GET['status']) && in_array($_GET['status'], array('online', 'offline'), true)
     ? $_GET['status']
     : '';
+  $visibility_filter = isset($_GET['visibility']) && in_array($_GET['visibility'], array('public', 'private'), true)
+    ? $_GET['visibility']
+    : '';
   $album_filter = isset($_GET['album_id']) ? (int)$_GET['album_id'] : 0;
-  $competition_filter = isset($_GET['competition_medium_id']) ? (int)$_GET['competition_medium_id'] : 0;
-  $filters = array('q' => $query_text, 'status' => $status_filter, 'album_id' => $album_filter, 'competition_medium_id' => $competition_filter);
+  $per_page_options = array(50, 100, 200);
+  $page_size = isset($_GET['per_page']) ? (int)$_GET['per_page'] : 50;
+  if (!in_array($page_size, $per_page_options, true))
+  {
+    $page_size = 50;
+  }
+  $filters = array('q' => $query_text, 'status' => $status_filter, 'visibility' => $visibility_filter, 'album_id' => $album_filter, 'per_page' => $page_size);
   $page_number = isset($_GET['p']) ? max(1, (int)$_GET['p']) : 1;
-  $page_size = 20;
   $where = array('1=1');
 
   if ('' !== $query_text)
   {
-    $like = pwg_db_real_escape_string('%'.$query_text.'%');
-    $where[] = '(i.name LIKE \''.$like.'\' OR i.file LIKE \''.$like.'\' OR i.comment LIKE \''.$like.'\' OR gw.code LIKE \''.$like.'\' OR gm.name LIKE \''.$like.'\')';
+    $like = gzca_sql_like_contains($query_text);
+    $where[] = '(i.name LIKE \''.$like.'\' ESCAPE \'\\\\\' OR i.file LIKE \''.$like.'\' ESCAPE \'\\\\\' OR i.comment LIKE \''.$like.'\' ESCAPE \'\\\\\' OR gw.code LIKE \''.$like.'\' ESCAPE \'\\\\\' OR EXISTS (SELECT 1 FROM '.IMAGE_CATEGORY_TABLE.' AS search_ic INNER JOIN '.CATEGORIES_TABLE.' AS search_c ON search_c.id = search_ic.category_id WHERE search_ic.image_id = i.id AND search_c.name LIKE \''.$like.'\' ESCAPE \'\\\\\'))';
   }
   if ('online' === $status_filter)
   {
-    $where[] = 'i.level = 0';
+    $where[] = "COALESCE(gw.status, IF(i.level = 0, 'online', 'offline')) = 'online'";
   }
   elseif ('offline' === $status_filter)
+  {
+    $where[] = "COALESCE(gw.status, IF(i.level = 0, 'online', 'offline')) = 'offline'";
+  }
+  if ('public' === $visibility_filter)
+  {
+    $where[] = 'i.level = 0';
+  }
+  elseif ('private' === $visibility_filter)
   {
     $where[] = 'i.level > 0';
   }
   if ($album_filter > 0)
   {
-    $where[] = 'EXISTS (SELECT 1 FROM '.IMAGE_CATEGORY_TABLE.' AS filter_ic WHERE filter_ic.image_id = i.id AND filter_ic.category_id = '.$album_filter.')';
+    $where[] = 'EXISTS (SELECT 1 FROM '.IMAGE_CATEGORY_TABLE.' AS filter_ic INNER JOIN '.CATEGORIES_TABLE.' AS filter_c ON filter_c.id = filter_ic.category_id WHERE filter_ic.image_id = i.id AND FIND_IN_SET('.$album_filter.', filter_c.uppercats) > 0)';
   }
-  if ($competition_filter > 0)
-  {
-    $where[] = 'gw.competition_medium_id = '.$competition_filter;
-  }
-
   $where_sql = implode(' AND ', $where);
-  list($total) = pwg_db_fetch_row(pwg_query('
-SELECT COUNT(*)
+  list($total, $total_filesize_kb) = pwg_db_fetch_row(pwg_query('
+SELECT COUNT(*), COALESCE(SUM(COALESCE(i.filesize, 0)), 0)
   FROM '.IMAGES_TABLE.' AS i
     LEFT JOIN '.GZCA_WORKS_TABLE.' AS gw ON gw.image_id = i.id
-    LEFT JOIN '.GZCA_COMPETITION_MEDIA_TABLE.' AS gm ON gm.id = gw.competition_medium_id
   WHERE '.$where_sql.'
 ;'));
   $pages = max(1, (int)ceil((int)$total / $page_size));
@@ -539,15 +701,10 @@ SELECT
     gw.featured,
     gw.sort_order,
     gw.download_count,
-    gw.competition_medium_id,
-    gw.competition_sort_order,
-    gm.name AS competition_name,
-    gm.slug AS competition_slug,
     ic.category_id,
     c.name AS category_name
   FROM '.IMAGES_TABLE.' AS i
     LEFT JOIN '.GZCA_WORKS_TABLE.' AS gw ON gw.image_id = i.id
-    LEFT JOIN '.GZCA_COMPETITION_MEDIA_TABLE.' AS gm ON gm.id = gw.competition_medium_id
     LEFT JOIN '.IMAGE_CATEGORY_TABLE.' AS ic ON ic.image_id = i.id
       AND ic.category_id = (
         SELECT ic2.category_id
@@ -564,13 +721,41 @@ SELECT
 ;');
   $works = array_map('gzca_prepare_work_row', $rows);
 
-  $base_params = array('q' => $query_text, 'status' => $status_filter, 'album_id' => $album_filter, 'competition_medium_id' => $competition_filter);
+  $base_params = array('q' => $query_text, 'status' => $status_filter, 'visibility' => $visibility_filter, 'album_id' => $album_filter, 'per_page' => $page_size);
+  $page_links = array();
+  $last_link_page = 0;
+  for ($link_page = 1; $link_page <= $pages; $link_page++)
+  {
+    $near_current = abs($link_page - $page_number) <= 2;
+    $near_edge = $link_page <= 2 || $link_page > $pages - 2;
+    if (!$near_current && !$near_edge)
+    {
+      continue;
+    }
+    if ($last_link_page > 0 && $link_page > $last_link_page + 1)
+    {
+      $page_links[] = array('page' => 0, 'label' => '...', 'url' => '', 'current' => false);
+    }
+    $page_links[] = array(
+      'page' => $link_page,
+      'label' => (string)$link_page,
+      'url' => gzca_admin_url('works', array_merge($base_params, array('p' => $link_page))),
+      'current' => $link_page === $page_number,
+      );
+    $last_link_page = $link_page;
+  }
   $pager = array(
     'page' => $page_number,
     'pages' => $pages,
     'total' => (int)$total,
+    'total_size_label' => (int)$total_filesize_kb > 0 ? gzca_format_bytes((int)$total_filesize_kb * 1024) : '0 KB',
+    'per_page' => $page_size,
+    'per_page_options' => $per_page_options,
+    'first_url' => $page_number > 1 ? gzca_admin_url('works', array_merge($base_params, array('p' => 1))) : '',
     'previous_url' => $page_number > 1 ? gzca_admin_url('works', array_merge($base_params, array('p' => $page_number - 1))) : '',
     'next_url' => $page_number < $pages ? gzca_admin_url('works', array_merge($base_params, array('p' => $page_number + 1))) : '',
+    'last_url' => $page_number < $pages ? gzca_admin_url('works', array_merge($base_params, array('p' => $pages))) : '',
+    'links' => $page_links,
     );
 }
 
@@ -578,6 +763,12 @@ $edit_work = null;
 if ('works' === $tab && !empty($_GET['edit']))
 {
   $edit_work = gzca_find_image((int)$_GET['edit']);
+  if (is_array($edit_work))
+  {
+    $edit_work['category_links'] = gzca_image_category_links((int)$edit_work['id']);
+    $edit_work['other_category_links'] = gzca_image_other_category_links((int)$edit_work['id'], (int)$edit_work['category_id']);
+    $edit_work['code_prefix_warning'] = gzca_code_prefix_warning($edit_work['code'], (int)$edit_work['category_id']);
+  }
 }
 
 $edit_category = null;
@@ -589,19 +780,6 @@ if ('categories' === $tab && !empty($_GET['edit']))
     {
       $category['description'] = gzca_strip_markers($category['comment']);
       $edit_category = $category;
-      break;
-    }
-  }
-}
-
-$edit_competition_medium = null;
-if ('competition' === $tab && !empty($_GET['edit']))
-{
-  foreach ($competition_media as $medium)
-  {
-    if ((int)$medium['id'] === (int)$_GET['edit'])
-    {
-      $edit_competition_medium = $medium;
       break;
     }
   }
@@ -639,23 +817,22 @@ $template->assign(array(
   'GZCA_UPLOAD_TARGET_COUNT' => $upload_target_count,
   'GZCA_PARENT_CATEGORIES' => $parent_categories,
   'GZCA_CATEGORY_GROUPS' => $category_groups,
-  'GZCA_COMPETITION_MEDIA' => $competition_media,
-  'GZCA_ACTIVE_COMPETITION_MEDIA' => $active_competition_media,
   'GZCA_WORKS' => $works,
   'GZCA_PAGER' => $pager,
   'GZCA_FILTERS' => $filters,
   'GZCA_EDIT_WORK' => $edit_work,
   'GZCA_EDIT_CATEGORY' => $edit_category,
-  'GZCA_EDIT_COMPETITION_MEDIUM' => $edit_competition_medium,
   'GZCA_CONFIG' => gzca_config(),
+  'GZCA_HERO_SLIDES' => gzca_admin_hero_slides(),
+  'GZCA_CONTACTS' => gzca_normalize_contacts(),
   'GZCA_QR_URL' => gzca_contact_qr_url(),
   'GZCA_LOGO_URL' => gzca_logo_url(),
   'GZCA_URLS' => array(
     'dashboard' => gzca_admin_url('dashboard'),
+    'home' => gzca_admin_url('home'),
     'upload' => gzca_admin_url('upload'),
     'works' => gzca_admin_url('works'),
     'categories' => gzca_admin_url('categories'),
-    'competition' => gzca_admin_url('competition'),
     'contact' => gzca_admin_url('contact'),
     'gallery' => get_gallery_home_url(),
     ),

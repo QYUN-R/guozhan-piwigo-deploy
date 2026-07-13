@@ -1,0 +1,33 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 1600 900" role="img" aria-label="传统建筑背景">
+  <defs>
+    <linearGradient id="sky" x1="0" y1="0" x2="0" y2="1">
+      <stop offset="0" stop-color="#e9ded0"/>
+      <stop offset=".48" stop-color="#d9cbb7"/>
+      <stop offset="1" stop-color="#f7f0e4"/>
+    </linearGradient>
+    <filter id="blur" x="-10%" y="-10%" width="120%" height="120%">
+      <feGaussianBlur stdDeviation="6"/>
+    </filter>
+  </defs>
+  <rect width="1600" height="900" fill="url(#sky)"/>
+  <g opacity=".16" fill="#4a4036">
+    <circle cx="132" cy="150" r="86"/>
+    <circle cx="1460" cy="690" r="130"/>
+  </g>
+  <path d="M0 640c175-78 308-82 462-16 130 56 230 52 367-15 145-72 294-75 446-11 118 50 228 56 325 20v282H0z" fill="#38463d" opacity=".32"/>
+  <g transform="translate(248 315)" fill="#17201e">
+    <path d="M146 186h620v46H146z"/>
+    <path d="M92 162h728l-78-68H170z"/>
+    <path d="M124 232h666v300H124z" opacity=".9"/>
+    <path d="M222 280h92v252h-92zM404 280h106v252H404zM604 280h92v252h-92z" fill="#d8c9af" opacity=".26"/>
+    <path d="M70 530h780v34H70z"/>
+    <path d="M10 150c135 14 260-17 374-92 33-22 63-22 96 0 111 74 245 105 402 92-32 32-91 56-178 72H188C104 207 45 183 10 150z"/>
+  </g>
+  <g filter="url(#blur)" fill="#fff7e9" opacity=".56">
+    <path d="M0 480c240-39 474-43 702-11s432 35 612 9c112-16 208-13 286 9v84c-174-32-343-37-508-15-200 27-392 23-576-12-180-34-352-30-516 12z"/>
+  </g>
+  <g opacity=".62" stroke="#9d4933" stroke-width="4" fill="none">
+    <path d="M1290 178c45 0 82 37 82 82s-37 82-82 82-82-37-82-82 37-82 82-82z"/>
+    <path d="M1242 260h96M1290 212v96"/>
+  </g>
+</svg>
