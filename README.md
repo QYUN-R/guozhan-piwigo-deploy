@@ -22,6 +22,13 @@ Runtime data is intentionally not stored in Git. Do not commit or overwrite:
 
 See [GUOZHAN-DEPLOY.md](GUOZHAN-DEPLOY.md) for deployment and validation notes.
 
+### Releases and rollback
+
+The deployed source version is recorded in `VERSION`. Stable GitHub revisions
+are tagged as `guozhan-YYYY.MM.DD.N`, and their changes are listed in
+`CHANGELOG.md`. To inspect or restore an older source release, check out its tag
+instead of guessing from backup folder names.
+
 ---
 
 <img src="https://piwigo.org/plugins/piwigo-piwigodotorg/images/piwigo.org.svg" width="200" alt="Piwigo logo">

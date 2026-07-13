@@ -1404,6 +1404,46 @@ body[data-contact-page] .page-hero {
   font-size: 18px;
 }
 
+.contact-wechat-copy {
+  appearance: none;
+  display: inline-block;
+  width: max-content;
+  max-width: 100%;
+  margin: 0;
+  padding: 0 0 2px;
+  border: 0;
+  border-bottom: 1px dashed var(--line);
+  background: transparent;
+  color: inherit;
+  font: inherit;
+  font-weight: inherit;
+  line-height: inherit;
+  text-align: left;
+  white-space: normal;
+  overflow-wrap: anywhere;
+  word-break: break-word;
+  cursor: copy;
+  transition: color .16s ease, border-color .16s ease;
+}
+
+.contact-wechat-copy:hover {
+  color: var(--seal);
+  border-bottom-color: var(--seal);
+}
+
+.contact-wechat-copy:focus-visible {
+  border-radius: 2px;
+  outline: 2px solid var(--seal);
+  outline-offset: 4px;
+}
+
+.contact-card-info .contact-wechat-copy {
+  color: var(--ink);
+  font-size: 18px;
+  font-weight: 700;
+  line-height: 1.35;
+}
+
 .contact-card-info .muted {
   margin: 0;
   line-height: 1.7;
@@ -2102,7 +2142,8 @@ body[data-contact-page] .page-hero {
   width: min(188px, 100%);
 }
 
-.contact-card-info strong {
+.contact-card-info strong,
+.contact-card-info .contact-wechat-copy {
   display: block;
   overflow-wrap: anywhere;
   word-break: break-word;
@@ -2198,7 +2239,8 @@ body[data-contact-page] .page-hero {
   width: min(152px, 100%);
 }
 
-.modal .contact-card-info strong {
+.modal .contact-card-info strong,
+.modal .contact-card-info .contact-wechat-copy {
   font-size: 15px;
 }
 
@@ -2485,7 +2527,9 @@ body[data-contact-page] .page-hero {
   }
 
   body[data-contact-page] .contact-card-info strong,
-  .modal .contact-card-info strong {
+  body[data-contact-page] .contact-card-info .contact-wechat-copy,
+  .modal .contact-card-info strong,
+  .modal .contact-card-info .contact-wechat-copy {
     font-size: 14px;
   }
 

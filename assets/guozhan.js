@@ -350,13 +350,75 @@
     showToast.timer = window.setTimeout(() => toast.classList.remove("is-visible"), 1800);
   }
 
-  async function copyText(value, successMessage) {
+  function fallbackCopyText(value) {
+    const input = document.createElement("textarea");
+    input.value = value;
+    input.setAttribute("readonly", "");
+    input.style.position = "fixed";
+    input.style.left = "-9999px";
+    input.style.opacity = "0";
+    document.body.appendChild(input);
+    input.select();
+    input.setSelectionRange(0, value.length);
+    let copied = false;
     try {
-      await navigator.clipboard.writeText(value);
-      showToast(successMessage);
+      copied = document.execCommand("copy");
     } catch (error) {
-      showToast("当前浏览器不支持自动复制");
+      copied = false;
     }
+    input.remove();
+    return copied;
+  }
+
+  async function copyText(value, successMessage) {
+    const text = String(value || "").trim();
+    if (!text) return;
+    let copied = false;
+    if (navigator.clipboard && window.isSecureContext) {
+      try {
+        await navigator.clipboard.writeText(text);
+        copied = true;
+      } catch (error) {
+        copied = false;
+      }
+    }
+    if (!copied) copied = fallbackCopyText(text);
+    showToast(copied ? successMessage : "请长按微信号手动复制");
+  }
+
+  function bindWechatCopyTargets(root) {
+    const scope = root || document;
+    scope.querySelectorAll("[data-contact-wechat]").forEach((target) => {
+      const value = String(target.textContent || target.getAttribute("data-copy-wechat") || WECHAT).trim();
+      if (!value) return;
+      target.classList.add("contact-wechat-copy");
+      target.setAttribute("data-copy-wechat", value);
+      target.setAttribute("title", "点击复制微信号");
+      target.setAttribute("aria-label", "复制微信号 " + value);
+      if (!target.matches("button, a")) {
+        target.setAttribute("role", "button");
+        target.setAttribute("tabindex", "0");
+      }
+    });
+
+    scope.querySelectorAll("[data-copy-wechat]").forEach((button) => {
+      if (button.dataset.copyWechatReady === "true") return;
+      button.dataset.copyWechatReady = "true";
+      if (!button.getAttribute("data-copy-wechat")) button.setAttribute("data-copy-wechat", WECHAT);
+      const copyWechat = () => {
+        const value = String(button.getAttribute("data-copy-wechat") || WECHAT).trim();
+        if (value) copyText(value, "已复制微信号：" + value);
+      };
+      button.addEventListener("click", copyWechat);
+      if (!button.matches("button, a")) {
+        button.addEventListener("keydown", (event) => {
+          if (event.key === "Enter" || event.key === " ") {
+            event.preventDefault();
+            copyWechat();
+          }
+        });
+      }
+    });
   }
 
   function openModal() {
@@ -457,10 +519,7 @@
       if (event.target === modal) closeModal();
     });
 
-    document.querySelectorAll("[data-copy-wechat]").forEach((button) => {
-      if (!button.getAttribute("data-copy-wechat")) button.setAttribute("data-copy-wechat", WECHAT);
-      button.addEventListener("click", () => copyText(button.getAttribute("data-copy-wechat") || WECHAT, "已复制微信号"));
-    });
+    bindWechatCopyTargets(document);
 
     wireImageLightbox();
 
@@ -989,19 +1048,18 @@
   }
 
   function contactCardMarkup(item, compact) {
+    const wechat = String(item.wechat || WECHAT).trim() || WECHAT;
     const qr = item.qrUrl ? '<div class="qr-box" data-has-qr="true"><img src="' + escapeHtml(normalizeUrl(item.qrUrl)) + '" alt="' + escapeHtml(item.label) + '二维码" loading="lazy" decoding="async"></div>' : '<div class="qr-box">' + escapeHtml(item.label) + '<br>二维码</div>';
     const note = !compact && item.note ? '<p class="muted" data-contact-note>' + escapeHtml(item.note) + '</p>' : '';
     return '<article class="contact-card' + (compact ? ' is-compact' : '') + '">' +
       '<p class="eyebrow">' + escapeHtml(item.label) + '</p>' +
       qr +
-      '<div class="contact-card-info"><span class="muted">微信号</span><strong data-contact-wechat>' + escapeHtml(item.wechat || WECHAT) + '</strong>' + note + '</div>' +
+      '<div class="contact-card-info"><span class="muted">微信号</span><button class="contact-wechat-copy" type="button" data-contact-wechat data-copy-wechat="' + escapeHtml(wechat) + '" title="点击复制微信号" aria-label="复制微信号 ' + escapeHtml(wechat) + '">' + escapeHtml(wechat) + '</button>' + note + '</div>' +
     '</article>';
   }
 
   function bindContactCopyButtons(container) {
-    container.querySelectorAll("[data-copy-wechat]").forEach((button) => {
-      button.addEventListener("click", () => copyText(button.getAttribute("data-copy-wechat") || WECHAT, "已复制微信号"));
-    });
+    bindWechatCopyTargets(container);
   }
 
   function renderContactList(container, contacts, compact) {
@@ -1033,6 +1091,7 @@
     container.innerHTML = '<div class="contact-modal-qrs"><p class="eyebrow">客服二维码</p><div class="contact-list">' +
       contacts.map((item) => contactCardMarkup(item, true)).join("") +
       '</div></div>' + contactGuideMarkup(note, appHref("categories"));
+    bindContactCopyButtons(container);
   }
 
   function renderContactQr(container, qrUrl, label) {
@@ -1076,6 +1135,7 @@
     if (primary.qrUrl) {
       document.querySelectorAll(".qr-box").forEach((node) => { if (!node.closest(".contact-card")) renderContactQr(node, primary.qrUrl, primary.label); });
     }
+    bindWechatCopyTargets(document);
   }
 
   function categoryHrefFromApi(category) {
