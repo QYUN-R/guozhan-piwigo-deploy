@@ -4,7 +4,7 @@ $root = Split-Path -Parent $PSScriptRoot
 $template = Get-Content -Raw (Join-Path $root 'themes\standard_pages\template\identification.tpl')
 $standardHeader = Get-Content -Raw (Join-Path $root 'themes\standard_pages\template\header.tpl')
 $galleryHeader = Get-Content -Raw (Join-Path $root 'themes\guozhan-gallery\template\header.tpl')
-$admin = Get-Content -Raw (Join-Path $root 'plugins\GuozhanClientAdmin\admin.php')
+$adminHeader = Get-Content -Raw (Join-Path $root 'admin\themes\default\template\header.tpl')
 $style = Get-Content -Raw (Join-Path $root 'themes\standard_pages\guozhan-login.css')
 $failures = [System.Collections.Generic.List[string]]::new()
 
@@ -19,7 +19,8 @@ if ($template -match '比赛' -or $template -notmatch '首页轮播') {
 }
 if ($standardHeader -notmatch 'themes/guozhan-gallery/assets/logo-mark\.png' -or
     $galleryHeader -notmatch 'themes/guozhan-gallery/assets/logo-mark\.png' -or
-    $admin -notmatch 'themes/guozhan-gallery/assets/logo-mark\.png') {
+    $adminHeader -notmatch 'themes/guozhan-gallery/assets/logo-mark\.png' -or
+    $adminHeader -match 'piwigo\.org-icon') {
     $failures.Add('Public, login, and administrator pages do not consistently use the Guozhan logo as the browser icon.')
 }
 if ($style -notmatch 'color-scheme:\s*light') {

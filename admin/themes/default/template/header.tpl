@@ -10,7 +10,7 @@
 {/if}
 <meta charset="{$CONTENT_ENCODING}">
 <title>{$GALLERY_TITLE} :: {$PAGE_TITLE}</title>
-<link rel="icon" type="image/svg+xml" href="{$ROOT_URL}{$themeconf.icon_dir}/piwigo.org-icon 1.svg">
+<link rel="icon" type="image/png" href="{$ROOT_URL}themes/guozhan-gallery/assets/logo-mark.png?v=20260714-favicon-1">
 <link rel="stylesheet" type="text/css" href="{$ROOT_URL}admin/themes/default/fonts/open-sans/open-sans.css">
 
 {strip}

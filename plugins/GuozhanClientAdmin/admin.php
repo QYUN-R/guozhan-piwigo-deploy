@@ -23,10 +23,6 @@ if (!empty($action))
 $email_security = gzca_admin_email_security_status((int)$user['id']);
 $mail_status = gzca_security_mail_status();
 $security_form_email = isset($_POST['new_email']) ? gzca_normalize_email($_POST['new_email']) : '';
-$template->append(
-  'head_elements',
-  '<link rel="icon" type="image/png" href="'.get_root_url().'themes/guozhan-gallery/assets/logo-mark.png?v=20260714-favicon-1">'
-  );
 
 if ('revoke_other_sessions' === $action)
 {
