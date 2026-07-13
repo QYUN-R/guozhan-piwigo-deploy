@@ -11,6 +11,7 @@ if (Test-Path $securityPath) {
 $admin = Get-Content -Raw (Join-Path $root 'plugins\GuozhanClientAdmin\admin.php')
 $template = Get-Content -Raw (Join-Path $root 'plugins\GuozhanClientAdmin\template\admin.tpl')
 $style = Get-Content -Raw (Join-Path $root 'plugins\GuozhanClientAdmin\assets\admin.css')
+$adminHeader = Get-Content -Raw (Join-Path $root 'admin\themes\default\template\header.tpl')
 $password = Get-Content -Raw (Join-Path $root 'password.php')
 $failures = [System.Collections.Generic.List[string]]::new()
 
@@ -165,6 +166,9 @@ if ($style -notmatch '\.gzca-security-layout\s*\{[^}]*grid-template-columns:\s*m
 }
 if ($style -notmatch '@media\s*\(max-width:\s*720px\)[\s\S]*?\.gzca-security') {
     $failures.Add('The account-security page has no explicit mobile layout.')
+}
+if ($adminHeader -notmatch '\$lang_info\.code\|replace:''_'':''-''') {
+    $failures.Add('The administrator document language is not normalized to a valid BCP 47 tag.')
 }
 if ($style -notmatch 'body#theAdminPage\s+#footer') {
     $failures.Add('The native fixed Piwigo footer can overlap the custom administrator on mobile.')
