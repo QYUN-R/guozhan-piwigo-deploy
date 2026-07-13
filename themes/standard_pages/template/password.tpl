@@ -49,15 +49,15 @@
 
           {if $action eq 'lost'}
             <label class="guozhan-password-field" for="username_or_email">
-              <span>管理员账号或恢复邮箱</span>
-              <span class="guozhan-password-input"><i class="gallery-icon-user-2"></i><input type="text" id="username_or_email" name="username_or_email" maxlength="100" value="{if isset($username_or_email)}{$username_or_email|escape:'html'}{/if}" autocomplete="username" autofocus required></span>
+              <span>管理员恢复邮箱</span>
+              <span class="guozhan-password-input"><i class="gallery-icon-user-2"></i><input type="email" id="username_or_email" name="username_or_email" maxlength="255" value="{if isset($username_or_email)}{$username_or_email|escape:'html'}{/if}" autocomplete="email" inputmode="email" autofocus required></span>
             </label>
             <button type="submit" name="submit" class="guozhan-password-submit">发送重置链接</button>
           {elseif $action eq 'lost_code'}
             <div class="guozhan-password-alert is-success" role="status"><p>如果账号存在，验证码已发送到已验证邮箱。</p></div>
             <label class="guozhan-password-field" for="user_code">
               <span>六位验证码</span>
-              <span class="guozhan-password-input"><i class="gallery-icon-lock"></i><input type="text" id="user_code" name="user_code" inputmode="numeric" pattern="[0-9]{6}" maxlength="6" autocomplete="one-time-code" autofocus required></span>
+              <span class="guozhan-password-input"><i class="gallery-icon-lock"></i><input type="text" id="user_code" name="user_code" inputmode="numeric" pattern="[0-9][0-9][0-9][0-9][0-9][0-9]" maxlength="6" autocomplete="one-time-code" autofocus required></span>
             </label>
             <button type="submit" name="submit" class="guozhan-password-submit">验证验证码</button>
           {elseif $action eq 'reset'}

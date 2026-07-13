@@ -3,6 +3,7 @@ $ErrorActionPreference = 'Stop'
 $root = Split-Path -Parent $PSScriptRoot
 $main = Get-Content -Raw (Join-Path $root 'plugins\GuozhanClientAdmin\main.inc.php')
 $functions = Get-Content -Raw (Join-Path $root 'plugins\GuozhanClientAdmin\include\functions.inc.php')
+$security = Get-Content -Raw (Join-Path $root 'plugins\GuozhanClientAdmin\include\security.inc.php')
 $admin = Get-Content -Raw (Join-Path $root 'plugins\GuozhanClientAdmin\admin.php')
 $template = Get-Content -Raw (Join-Path $root 'plugins\GuozhanClientAdmin\template\admin.tpl')
 $style = Get-Content -Raw (Join-Path $root 'plugins\GuozhanClientAdmin\assets\admin.css')
@@ -22,6 +23,9 @@ if ($main -notmatch "add_event_handler\('user_login',\s*'gzca_record_admin_sessi
 if ($main -notmatch "add_event_handler\('loc_end_identification',\s*'gzca_prepare_login_notice'\)") {
     $failures.Add('The login page has no safe session-expiry notice hook.')
 }
+if ($main -notmatch "add_event_handler\('try_log_user',\s*'gzca_capture_login_identifier',\s*5\)") {
+    $failures.Add('The submitted login identifier is not captured before Piwigo resolves username or email.')
+}
 if ($functions -notmatch 'function\s+gzca_record_admin_session\s*\(' -or
     $functions -notmatch "\`$_SESSION\['gzca_admin_user_id'\]" -or
     $functions -notmatch "\`$_SESSION\['gzca_admin_issued_at'\]") {
@@ -36,6 +40,12 @@ if ($functions -notmatch 'function\s+gzca_force_admin_reauthentication\s*\(' -or
     $functions -notmatch 'logout_user\s*\(\s*\)' -or
     $functions -notmatch "gzca_auth") {
     $failures.Add('Missing, expired, or invalid administrator sessions are not logged out and redirected safely.')
+}
+if ($functions -notmatch 'function\s+gzca_capture_login_identifier\s*\(' -or
+    $functions -notmatch 'gzca_login_identifier' -or
+    $functions -notmatch 'gzca_admin_verified_email_login_allowed\s*\(' -or
+    $security -notmatch 'function\s+gzca_admin_verified_email_login_allowed\s*\(') {
+    $failures.Add('Administrator authentication is not restricted to the verified bound email address.')
 }
 if ($functions -notmatch 'log_user\s*\(\s*\(int\)\$user_found\[''id''\]\s*,\s*true\s*\)' -or
     $functions -notmatch "\`$state\['authenticated'\]\s*=\s*true") {
@@ -62,6 +72,11 @@ if ($login -notmatch 'name="remember_me"[^>]*checked' -or
     $login -notmatch '保持登录 7 天' -or
     $login -notmatch '仅允许已授权管理员登录') {
     $failures.Add('The login page does not clearly offer the seven-day administrator-only session.')
+}
+if ($login -notmatch '<label for="username">管理员邮箱</label>' -or
+    $login -notmatch 'type="email"\s+name="username"' -or
+    $login -notmatch 'autocomplete="email"') {
+    $failures.Add('The administrator login form still asks for an internal username instead of the verified email.')
 }
 
 if ($failures.Count -gt 0) {

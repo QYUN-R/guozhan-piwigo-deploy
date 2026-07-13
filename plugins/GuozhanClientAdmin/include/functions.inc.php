@@ -367,29 +367,46 @@ function gzca_admin_identity()
 
 function gzca_prepare_login_notice()
 {
-  global $template;
+  global $page, $template;
 
   $reason = isset($_GET['gzca_auth']) ? (string)$_GET['gzca_auth'] : '';
   $messages = array(
     'reauth' => '后台安全策略已更新，请重新验证管理员身份。',
-    'expired' => '管理员登录状态已超过 7 天，请重新输入账号和密码。',
-    'unauthorized' => '当前账号没有后台权限，请使用已授权管理员账号登录。',
+    'expired' => '管理员登录状态已超过 7 天，请重新输入邮箱和密码。',
+    'unauthorized' => '当前邮箱没有后台权限，请使用已验证的管理员邮箱登录。',
     'password_changed' => '管理员密码已更新，旧登录状态和访问密钥已撤销，请使用新密码重新登录。',
-    'sessions_revoked' => '此设备的管理员登录已被撤销，请重新输入账号和密码。',
+    'sessions_revoked' => '此设备的管理员登录已被撤销，请重新输入邮箱和密码。',
     );
 
   if (isset($messages[$reason]))
   {
     $template->assign('GZCA_AUTH_NOTICE', $messages[$reason]);
   }
+  if (!empty($page['errors']['login_form_error']))
+  {
+    $page['errors']['login_form_error'] = '邮箱或密码错误。';
+  }
+}
+
+function gzca_capture_login_identifier($success, $username, $password, $remember_me)
+{
+  $GLOBALS['gzca_login_identifier'] = (string)$username;
+  return $success;
 }
 
 function gzca_finalize_login_whitelist($state, $user_found, $remember_me)
 {
-  if (!gzca_admin_account_is_allowed($user_found))
+  $identifier = isset($GLOBALS['gzca_login_identifier'])
+    ? (string)$GLOBALS['gzca_login_identifier']
+    : '';
+  unset($GLOBALS['gzca_login_identifier']);
+
+  $email_login_allowed = function_exists('gzca_admin_verified_email_login_allowed')
+    && gzca_admin_verified_email_login_allowed($user_found, $identifier);
+  if (!gzca_admin_account_is_allowed($user_found) || !$email_login_allowed)
   {
     $state['can_login'] = false;
-    $state['reason'] = 'gzca_login_not_whitelisted';
+    $state['reason'] = 'gzca_login_not_verified_email';
     return $state;
   }
 

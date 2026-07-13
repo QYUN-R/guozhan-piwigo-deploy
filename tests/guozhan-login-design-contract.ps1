@@ -17,6 +17,11 @@ if ($template -notmatch 'color-scheme" content="light') {
 if ($template -match '比赛' -or $template -notmatch '首页轮播') {
     $failures.Add('The login copy does not match the current website management sections.')
 }
+if ($template -notmatch '<label for="username">管理员邮箱</label>' -or
+    $template -notmatch 'type="email"\s+name="username"' -or
+    $template -notmatch 'autocomplete="email"') {
+    $failures.Add('The login page still presents an internal username field instead of the verified administrator email.')
+}
 if ($standardHeader -notmatch 'themes/guozhan-gallery/assets/logo-mark\.png' -or
     $galleryHeader -notmatch 'themes/guozhan-gallery/assets/logo-mark\.png' -or
     $adminHeader -notmatch 'themes/guozhan-gallery/assets/logo-mark\.png' -or

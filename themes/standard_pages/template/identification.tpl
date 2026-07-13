@@ -66,10 +66,10 @@
 
       <form class="properties guozhan-login-form" action="{$F_LOGIN_ACTION|escape:'html'}" method="post" name="login_form">
         <div class="column-flex guozhan-login-field">
-          <label for="username">{'Username'|translate|escape:'html'}</label>
+          <label for="username">管理员邮箱</label>
           <div class="row-flex input-container">
             <i class="gallery-icon-user"></i>
-            <input tabindex="1" type="text" name="username" id="username" size="25" autocomplete="username" autofocus data-required="true">
+            <input tabindex="1" type="email" name="username" id="username" size="25" maxlength="255" autocomplete="email" inputmode="email" autofocus data-required="true">
           </div>
           <p class="error-message"><i class="gallery-icon-attention-circled"></i> {'must not be empty'|translate|escape:'html'}</p>
         </div>

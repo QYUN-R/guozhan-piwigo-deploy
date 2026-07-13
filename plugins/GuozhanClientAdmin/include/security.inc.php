@@ -116,6 +116,36 @@ function gzca_admin_password_recovery_allowed($user_id, $email='')
     && hash_equals($expected, $candidate);
 }
 
+function gzca_admin_verified_email_login_allowed($account, $identifier, $security_status=null)
+{
+  if (!is_array($account) || empty($account['id']) || empty($account['email']))
+  {
+    return false;
+  }
+
+  $identifier = gzca_normalize_email($identifier);
+  $account_email = gzca_normalize_email($account['email']);
+  if (false === filter_var($identifier, FILTER_VALIDATE_EMAIL)
+      || '' === $account_email
+      || !hash_equals($account_email, $identifier))
+  {
+    return false;
+  }
+
+  if (null === $security_status)
+  {
+    $security_status = gzca_admin_email_security_status((int)$account['id']);
+  }
+  $verified_email = is_array($security_status) && isset($security_status['email'])
+    ? gzca_normalize_email($security_status['email'])
+    : '';
+
+  return is_array($security_status)
+    && !empty($security_status['verified'])
+    && '' !== $verified_email
+    && hash_equals($verified_email, $identifier);
+}
+
 function gzca_password_reset_rate_state($record, $now=null)
 {
   $record = is_array($record) ? $record : array();

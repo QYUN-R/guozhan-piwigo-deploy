@@ -45,18 +45,16 @@ function process_password_reset_link_request()
 {
   global $page, $conf;
 
-  $username_or_email = trim($_POST['username_or_email'] ?? '');
-  if (empty($username_or_email))
+  $username_or_email = function_exists('gzca_normalize_email')
+    ? gzca_normalize_email($_POST['username_or_email'] ?? '')
+    : strtolower(trim((string)($_POST['username_or_email'] ?? '')));
+  if (empty($username_or_email) || false === filter_var($username_or_email, FILTER_VALIDATE_EMAIL))
   {
-    $page['errors']['password_form_error'] = l10n('Invalid username or email');
+    $page['errors']['password_form_error'] = '请输入有效的管理员恢复邮箱。';
     return false;
   }
 
   $user_id = get_userid_by_email($username_or_email);
-  if (!is_numeric($user_id))
-  {
-    $user_id = get_userid($username_or_email);
-  }
 
   $is_user_found = is_numeric($user_id);
   if ($is_user_found)
@@ -66,7 +64,7 @@ function process_password_reset_link_request()
       && !is_a_guest($userdata['status'])
       && !is_generic($userdata['status'])
       && function_exists('gzca_admin_password_recovery_allowed')
-      && gzca_admin_password_recovery_allowed((int)$user_id, $userdata['email']);
+      && gzca_admin_password_recovery_allowed((int)$user_id, $username_or_email);
 
     $retry_after = 0;
     if ($can_send

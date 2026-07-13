@@ -55,6 +55,26 @@ expect_true(
   'Email fingerprinting is not case-normalized.'
   );
 
+$verified_login_status = array('verified' => true, 'email' => 'customer@example.com');
+$unverified_login_status = array('verified' => false, 'email' => 'customer@example.com');
+$admin_account = array('id' => 7, 'email' => 'customer@example.com');
+expect_true(
+  gzca_admin_verified_email_login_allowed($admin_account, ' Customer@Example.com ', $verified_login_status),
+  'A verified administrator email was rejected as a login identifier.'
+  );
+expect_true(
+  !gzca_admin_verified_email_login_allowed($admin_account, 'admin', $verified_login_status),
+  'The internal administrator username was accepted as a login identifier.'
+  );
+expect_true(
+  !gzca_admin_verified_email_login_allowed($admin_account, 'other@example.com', $verified_login_status),
+  'An email not bound to the administrator was accepted.'
+  );
+expect_true(
+  !gzca_admin_verified_email_login_allowed($admin_account, 'customer@example.com', $unverified_login_status),
+  'An unverified administrator email was accepted.'
+  );
+
 $now = 1800000000;
 $rate_state = gzca_password_reset_rate_state(array(), $now);
 expect_true($rate_state['allowed'], 'A first password-reset email was rate limited.');

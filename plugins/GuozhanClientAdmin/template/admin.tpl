@@ -438,7 +438,7 @@
                       <input type="hidden" name="pwg_token" value="{$GZCA_TOKEN|escape:'html'}">
                       <input type="hidden" name="gzca_action" value="verify_bind_email">
                       <label class="gzca-field"><span>同一个新邮箱</span><input type="email" name="new_email" value="{$GZCA_SECURITY_FORM.new_email|escape:'html'}" maxlength="255" autocomplete="email" required></label>
-                      <label class="gzca-field"><span>六位验证码</span><input type="text" name="verification_code" inputmode="numeric" pattern="[0-9]{6}" maxlength="6" autocomplete="one-time-code" required>{if $GZCA_EMAIL_SECURITY.bind_challenge.active}<small>验证码有效至 {$GZCA_EMAIL_SECURITY.bind_challenge.expires_at|escape:'html'}。</small>{/if}</label>
+                      <label class="gzca-field"><span>六位验证码</span><input type="text" name="verification_code" inputmode="numeric" pattern="[0-9][0-9][0-9][0-9][0-9][0-9]" maxlength="6" autocomplete="one-time-code" required>{if $GZCA_EMAIL_SECURITY.bind_challenge.active}<small>验证码有效至 {$GZCA_EMAIL_SECURITY.bind_challenge.expires_at|escape:'html'}。</small>{/if}</label>
                       <label class="gzca-field"><span>再次输入当前密码</span><input type="password" name="current_password" maxlength="256" autocomplete="current-password" required></label>
                       <button class="gzca-button gzca-button-primary" type="submit" {if !$GZCA_SECURITY_MAIL.ready and !$GZCA_EMAIL_SECURITY.bind_challenge.active}disabled aria-disabled="true"{/if}>验证并绑定邮箱</button>
                     </form>
@@ -500,7 +500,7 @@
                       <input type="hidden" name="pwg_token" value="{$GZCA_TOKEN|escape:'html'}">
                       <input type="hidden" name="gzca_action" value="change_admin_password">
                       <label class="gzca-field"><span>当前管理员密码</span><input type="password" name="current_password" maxlength="256" autocomplete="current-password" required></label>
-                      <label class="gzca-field"><span>邮箱验证码</span><input type="text" name="verification_code" inputmode="numeric" pattern="[0-9]{6}" maxlength="6" autocomplete="one-time-code" required>{if $GZCA_EMAIL_SECURITY.password_challenge.active}<small>验证码有效至 {$GZCA_EMAIL_SECURITY.password_challenge.expires_at|escape:'html'}。</small>{/if}</label>
+                      <label class="gzca-field"><span>邮箱验证码</span><input type="text" name="verification_code" inputmode="numeric" pattern="[0-9][0-9][0-9][0-9][0-9][0-9]" maxlength="6" autocomplete="one-time-code" required>{if $GZCA_EMAIL_SECURITY.password_challenge.active}<small>验证码有效至 {$GZCA_EMAIL_SECURITY.password_challenge.expires_at|escape:'html'}。</small>{/if}</label>
                       <label class="gzca-field"><span>新密码</span><input type="password" name="new_password" minlength="12" maxlength="128" autocomplete="new-password" required></label>
                       <label class="gzca-field"><span>确认新密码</span><input type="password" name="new_password_confirm" minlength="12" maxlength="128" autocomplete="new-password" required></label>
                       <button class="gzca-button gzca-button-danger" type="submit">验证并修改密码</button>

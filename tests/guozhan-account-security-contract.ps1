@@ -166,6 +166,12 @@ if ($template -notmatch 'gzca-email-overview' -or
     $template -notmatch 'gzca-security-step') {
     $failures.Add('The account-center workflow is not grouped into a clear email overview and numbered steps.')
 }
+if ($template -match 'pattern="\[0-9\]\{6\}"' -or
+    $template -notmatch 'pattern="\[0-9\]\[0-9\]\[0-9\]\[0-9\]\[0-9\]\[0-9\]"' -or
+    $passwordTemplate -match 'pattern="\[0-9\]\{6\}"' -or
+    $passwordTemplate -notmatch 'pattern="\[0-9\]\[0-9\]\[0-9\]\[0-9\]\[0-9\]\[0-9\]"') {
+    $failures.Add('A Smarty-interpreted numeric quantifier can break six-digit verification-code validation in the browser.')
+}
 if ($template -notmatch '\{if \$GZCA_EMAIL_SECURITY\.storage_ready\}[\s\S]{0,500}gzca-email-binding' -or
     $template -match '\{if \$GZCA_EMAIL_SECURITY\.storage_ready and \$GZCA_SECURITY_MAIL\.ready\}' -or
     $template -notmatch '\{if !\$GZCA_SECURITY_MAIL\.ready\}disabled aria-disabled="true"\{/if\}' -or
@@ -194,6 +200,10 @@ if ($password -notmatch 'gzca_admin_password_recovery_allowed\s*\(' -or
     $password -notmatch '\$page\[''action''\]\s*=\s*''sent''' -or
     $password -notmatch 'gzca_revoke_user_credentials\s*\(\s*\$user_id\s*\)') {
     $failures.Add('Forgot-password does not send a generic, verified-email-only one-time link or revoke credentials after reset.')
+}
+if ($password -match 'get_userid\s*\(\s*\$username_or_email' -or
+    $password -notmatch 'filter_var\([^\r\n]+FILTER_VALIDATE_EMAIL') {
+    $failures.Add('Password recovery still accepts an internal username instead of requiring the registered verified email.')
 }
 if ([regex]::Matches($password, 'gzca_admin_password_recovery_allowed\s*\(').Count -lt 3 -or
     $password -notmatch 'check_password_reset_key[\s\S]{0,2500}gzca_admin_password_recovery_allowed' -or

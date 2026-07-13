@@ -2,6 +2,7 @@ $ErrorActionPreference = 'Stop'
 
 $root = Split-Path -Parent $PSScriptRoot
 $template = Get-Content -Raw (Join-Path $root 'themes\standard_pages\template\password.tpl')
+$passwordPhp = Get-Content -Raw (Join-Path $root 'password.php')
 $stylePath = Join-Path $root 'themes\standard_pages\guozhan-password.css'
 $style = if (Test-Path $stylePath) { Get-Content -Raw $stylePath } else { '' }
 $failures = [System.Collections.Generic.List[string]]::new()
@@ -21,6 +22,12 @@ foreach ($field in @('username_or_email', 'user_code', 'use_new_pwd', 'passwordC
     if ($template -notmatch ('name="' + [regex]::Escape($field) + '"')) {
         $failures.Add('The password-reset template lost required field: ' + $field)
     }
+}
+if ($template -notmatch '<span>管理员恢复邮箱</span>' -or
+    $template -notmatch 'type="email"\s+id="username_or_email"' -or
+    $template -notmatch 'autocomplete="email"' -or
+    $passwordPhp -match 'get_userid\(\$username_or_email\)') {
+    $failures.Add('Password recovery still accepts or advertises the internal administrator username.')
 }
 if ($template -notmatch 'autocomplete="one-time-code"' -or
     $template -notmatch 'autocomplete="new-password"') {
