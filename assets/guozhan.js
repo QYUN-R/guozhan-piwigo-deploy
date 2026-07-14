@@ -1096,28 +1096,31 @@
     bindContactCopyButtons(container);
   }
 
-  function contactGuideMarkup(note, actionHref) {
-    const safeNote = escapeHtml(note || "咨询高清图、同类作品或使用说明时，请发送作品编号或页面截图。");
+  function contactGuideMarkup(contact, actionHref) {
+    const data = contact || {};
+    const safeSendContent = escapeHtml(data.sendContent || "作品编号 / 页面截图 / 学习需求");
+    const safeCourseLearning = escapeHtml(data.courseLearning || "绘画课程咨询、学习方向与作品参考");
+    const safeConsultationTip = escapeHtml(data.consultationTip || "请发送作品编号和学习需求，客服将及时协助。");
     return '<div class="contact-guide">' +
       '<p class="eyebrow">沟通说明</p>' +
       '<h3>扫码添加客服，发送作品编号确认素材</h3>' +
       '<p class="lead">客服会根据编号定位作品，协助确认高清素材、同类推荐、使用方式和交付信息。</p>' +
       '<div class="contact-guide-list">' +
-        '<div class="contact-guide-row"><span>发送内容</span><strong>作品编号 / 页面截图 / 所需用途</strong></div>' +
-        '<div class="contact-guide-row"><span>咨询范围</span><strong>高清素材、同类作品、编号归档与使用方式</strong></div>' +
-        '<div class="contact-guide-row"><span>咨询提示</span><strong>' + safeNote + '</strong></div>' +
+        '<div class="contact-guide-row"><span>发送内容</span><strong>' + safeSendContent + '</strong></div>' +
+        '<div class="contact-guide-row"><span>课程学习</span><strong>' + safeCourseLearning + '</strong></div>' +
+        '<div class="contact-guide-row"><span>咨询提示</span><strong>' + safeConsultationTip + '</strong></div>' +
       '</div>' +
       '<div class="contact-actions"><a class="btn btn-secondary" href="' + actionHref + '">继续浏览作品</a></div>' +
     '</div>';
   }
 
-  function renderContactModalBand(container, contacts, note) {
+  function renderContactModalBand(container, contacts, contact) {
     if (!container) return;
     container.classList.add("contact-modal-layout");
     container.removeAttribute("data-contact-modal-list");
     container.innerHTML = '<div class="contact-modal-qrs"><p class="eyebrow">客服二维码</p><div class="contact-list">' +
       contacts.map((item) => contactCardMarkup(item, true)).join("") +
-      '</div></div>' + contactGuideMarkup(note, appHref("categories"));
+      '</div></div>' + contactGuideMarkup(contact, appHref("categories"));
     bindContactCopyButtons(container);
   }
 
@@ -1148,9 +1151,9 @@
     document.querySelectorAll("[data-footer-brand], .footer-inner span:first-child").forEach((node) => { node.textContent = "© " + brandName; });
     document.querySelectorAll("[data-contact-list]").forEach((node) => renderContactList(node, contacts, false));
     document.querySelectorAll('body[data-contact-page] [data-od-id="contact-main"] .contact-band > div:last-child').forEach((node) => {
-      node.outerHTML = contactGuideMarkup(note, appHref("categories"));
+      node.outerHTML = contactGuideMarkup(contact, appHref("categories"));
     });
-    document.querySelectorAll(".modal .contact-band").forEach((node) => renderContactModalBand(node, contacts, note));
+    document.querySelectorAll(".modal .contact-band").forEach((node) => renderContactModalBand(node, contacts, contact));
     document.querySelectorAll("[data-contact-modal-list]").forEach((node) => {
       if (!node.closest(".modal")) renderContactList(node, contacts, true);
     });

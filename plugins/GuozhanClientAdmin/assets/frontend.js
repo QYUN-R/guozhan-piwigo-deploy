@@ -31,6 +31,46 @@
     box.appendChild(image);
   }
 
+  function cssUrl(value) {
+    return String(value || "").replace(/["\\\n\r]/g, "");
+  }
+
+  function applyHeroSlides() {
+    var slides = (window.GZCA_HERO_SLIDES || []).filter(function (slide) {
+      return slide && slide.url;
+    });
+    if (!slides.length) return;
+
+    var canvas = document.querySelector(".hero-canvas");
+    if (!canvas) return;
+
+    var existing = Array.prototype.slice.call(canvas.querySelectorAll(".hero-slide"));
+    while (existing.length < slides.length) {
+      var next = document.createElement("div");
+      next.className = "hero-slide";
+      canvas.insertBefore(next, canvas.firstChild);
+      existing.push(next);
+    }
+    existing.forEach(function (node, index) {
+      if (index >= slides.length) {
+        node.remove();
+        return;
+      }
+      var slide = slides[index];
+      node.style.backgroundImage = 'url("' + cssUrl(slide.url) + '")';
+      node.style.backgroundPosition = slide.position || "center";
+      if (slides.length === 1) {
+        node.style.animation = "none";
+        node.style.opacity = "1";
+        node.style.transform = "scale(1.02)";
+      } else {
+        node.style.animationDuration = (slides.length * 6) + "s";
+        node.style.animationDelay = (index * 6) + "s";
+      }
+    });
+    if (slides[0].title) canvas.setAttribute("aria-label", slides[0].title);
+  }
+
   function applyContact() {
     var contact = window.GZCA_CONTACT || {};
     if (!contact.brandName && !contact.logoUrl && !contact.wechat && !contact.qrUrl && !contact.note) return;
@@ -67,6 +107,16 @@
       setText(tip, contact.note);
     });
 
+    document.querySelectorAll("[data-contact-send-content]").forEach(function (node) {
+      setText(node, contact.sendContent);
+    });
+    document.querySelectorAll("[data-contact-course-learning]").forEach(function (node) {
+      setText(node, contact.courseLearning);
+    });
+    document.querySelectorAll("[data-contact-consultation-tip]").forEach(function (node) {
+      setText(node, contact.consultationTip);
+    });
+
     document.querySelectorAll(".detail-row").forEach(function (row) {
       var label = row.querySelector(".muted");
       if (!label) return;
@@ -79,14 +129,21 @@
           row.hidden = true;
         }
       }
-      if (label.textContent.indexOf("咨询提示") >= 0) setText(row.querySelector("strong, span:last-child"), contact.note);
+      if (label.textContent.indexOf("发送内容") >= 0) setText(row.querySelector("strong, span:last-child"), contact.sendContent);
+      if (label.textContent.indexOf("课程学习") >= 0) setText(row.querySelector("strong, span:last-child"), contact.courseLearning);
+      if (label.textContent.indexOf("咨询提示") >= 0) setText(row.querySelector("strong, span:last-child"), contact.consultationTip || contact.note);
     });
   }
 
-  if (document.readyState === "loading") {
-    document.addEventListener("DOMContentLoaded", applyContact);
-  } else {
+  function applyFrontendState() {
+    applyHeroSlides();
     applyContact();
   }
-  document.addEventListener("guozhan:rendered", applyContact);
+
+  if (document.readyState === "loading") {
+    document.addEventListener("DOMContentLoaded", applyFrontendState);
+  } else {
+    applyFrontendState();
+  }
+  document.addEventListener("guozhan:rendered", applyFrontendState);
 })();

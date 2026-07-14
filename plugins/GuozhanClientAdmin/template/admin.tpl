@@ -540,6 +540,13 @@
             <label class="gzca-check"><input type="checkbox" name="frontend_sync" value="1" {if $GZCA_CONFIG.frontend_sync}checked{/if}><span><strong>同步到网站客服区域</strong><small>会同步前台联系客服页、客服弹窗里的两个微信号、说明和二维码。</small></span></label>
           </div>
 
+          <div class="gzca-side-note"><strong>客服页沟通文案</strong><span>下面三项会显示在前台客服页和客服弹层，可随时修改。</span></div>
+          <div class="gzca-contact-fields">
+            <label class="gzca-field"><span>发送内容</span><input type="text" name="contact_send_content" maxlength="200" value="{$GZCA_CONFIG.contact_send_content|escape:'html'}" required></label>
+            <label class="gzca-field"><span>课程学习</span><input type="text" name="contact_course_learning" maxlength="200" value="{$GZCA_CONFIG.contact_course_learning|escape:'html'}" required></label>
+            <label class="gzca-field"><span>咨询提示</span><input type="text" name="contact_consultation_tip" maxlength="240" value="{$GZCA_CONFIG.contact_consultation_tip|escape:'html'}" required></label>
+          </div>
+
           <div class="gzca-contact-admin-grid">
             {foreach from=$GZCA_CONTACTS item=contact}
               <article class="gzca-contact-card">

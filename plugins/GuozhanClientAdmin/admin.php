@@ -688,9 +688,20 @@ if ('save_home_hero' === $action)
 if ('save_contact' === $action)
 {
   $config = gzca_config();
+  $defaults = gzca_default_config();
   $config['brand_name'] = gzca_clean_text(isset($_POST['brand_name']) ? $_POST['brand_name'] : '', 120);
   $config['brand_en'] = gzca_clean_text(isset($_POST['brand_en']) ? $_POST['brand_en'] : '', 160);
   $config['phone'] = gzca_clean_text(isset($_POST['phone']) ? $_POST['phone'] : '', 80);
+  $config['contact_send_content'] = gzca_clean_text(isset($_POST['contact_send_content']) ? $_POST['contact_send_content'] : '', 200);
+  $config['contact_course_learning'] = gzca_clean_text(isset($_POST['contact_course_learning']) ? $_POST['contact_course_learning'] : '', 200);
+  $config['contact_consultation_tip'] = gzca_clean_text(isset($_POST['contact_consultation_tip']) ? $_POST['contact_consultation_tip'] : '', 240);
+  foreach (array('contact_send_content', 'contact_course_learning', 'contact_consultation_tip') as $copy_key)
+  {
+    if ('' === $config[$copy_key])
+    {
+      $config[$copy_key] = $defaults[$copy_key];
+    }
+  }
   $config['frontend_sync'] = isset($_POST['frontend_sync']);
   $config['restrict_administrators'] = true;
 
@@ -747,7 +758,7 @@ if ('save_contact' === $action)
     $config['qr_path'] = $contacts[0]['qr_path'];
     conf_update_param('gzca_config', $config, true, 'serialize');
     $conf['gzca_config'] = $config;
-    $page['infos'][] = '客服信息已保存，两个客服会同步到前台客服入口。';
+    $page['infos'][] = '客服信息与沟通文案已保存，前台客服入口会自动同步。';
   }
 }
 

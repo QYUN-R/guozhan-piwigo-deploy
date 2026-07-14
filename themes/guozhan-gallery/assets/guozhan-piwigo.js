@@ -33,14 +33,17 @@
   function inferPage() {
     var bodyId = body.getAttribute("data-piwigo-body-id") || body.id || "";
     var href = window.location.href;
-    if (bodyId === "thePicturePage") return "detail";
-    if (/search|qsearch/i.test(window.location.pathname)) return "search";
-    if (href.indexOf("?/category/") >= 0 || params.has("cat_id")) return "category";
+    var path = window.location.pathname;
+    if (bodyId === "thePicturePage" || /\/screens\/detail\.html$/i.test(path) || params.has("code")) return "detail";
+    if (/\/screens\/category-list\.html$/i.test(path) || /\/screens\/category\.html$/i.test(path) || href.indexOf("?/category/") >= 0 || params.has("cat_id") || params.has("cat")) return "category";
+    if (/\/screens\/categories\.html$/i.test(path)) return "categories";
+    if (/\/screens\/search\.html$/i.test(path) || /search|qsearch/i.test(path)) return "search";
+    if (/\/screens\/contact\.html$/i.test(path)) return "contact";
     return "home";
   }
 
   function setMode(name) {
-    ["data-home-page", "data-categories-page", "data-category-page", "data-search-page", "data-detail-page", "data-contact-page", "data-competition-page"].forEach(function (attr) {
+    ["data-home-page", "data-categories-page", "data-category-page", "data-search-page", "data-detail-page", "data-contact-page"].forEach(function (attr) {
       body.removeAttribute(attr);
     });
     body.setAttribute("data-" + (name === "category" ? "category" : name) + "-page", "");
@@ -56,7 +59,6 @@
       '<nav class="nav" data-nav aria-label="主导航">' +
         '<a href="' + appUrl("home") + '"' + current("home", active) + '>首页</a>' +
         '<a href="' + appUrl("categories") + '"' + current("categories", active) + '>作品分类</a>' +
-        '<a href="' + appUrl("competition") + '"' + current("competition", active) + '>比赛</a>' +
         '<a href="' + appUrl("search") + '"' + current("search", active) + '>搜索</a>' +
         '<a href="' + appUrl("contact") + '"' + current("contact", active) + '>联系客服</a>' +
       '</nav><div class="nav-actions"><button class="menu-toggle" type="button" data-menu-toggle aria-label="打开导航" aria-expanded="false">☰</button></div>' +
@@ -83,16 +85,15 @@
     var crumbHtml = crumbs.map(function (item, index) {
       if (index === 0) return '<a href="' + appUrl("home") + '">' + item + '</a>';
       if (item === "作品分类") return '<a href="' + appUrl("categories") + '">' + item + '</a>';
-      if (item === "比赛") return '<a href="' + appUrl("competition") + '">' + item + '</a>';
       return '<span>' + item + '</span>';
     }).join("<span>/</span>");
     return '<section class="page-hero" data-od-id="' + id + '"><div class="container"><nav class="breadcrumb" aria-label="面包屑">' + crumbHtml + '</nav><h1>' + title + '</h1><p class="lead">' + lead + '</p>' + (extra || "") + '</div></section>';
   }
 
   function homeMain() {
-    return '<main><section class="hero" data-od-id="home-hero"><div class="hero-canvas" role="img" aria-label="国展作品素材展厅"><div class="hero-slide"></div><div class="hero-slide"></div><div class="hero-slide"></div></div><div class="container"><div class="hero-content"><h1>国展参赛作品素材库</h1><p class="hero-lead">围绕国画、油画、版画、雕塑、漆画、水彩及比赛专项整理作品，按分类、题材与编号高效定位所需素材。</p>' +
-        searchForm("home-q", "输入作品编号、画种、题材或比赛关键词...") + quickTags() +
-        '<div class="hero-meta"><span>作品图库</span><span>分类选稿</span><span>比赛作品</span></div></div></div></section>' +
+    return '<main><section class="hero" data-od-id="home-hero"><div class="hero-canvas" role="img" aria-label="国展作品素材展厅"><div class="hero-slide"></div><div class="hero-slide"></div><div class="hero-slide"></div></div><div class="container"><div class="hero-content"><h1>国展绘画作品素材库</h1><p class="hero-lead">围绕国画、油画、版画、雕塑、漆画、水彩等方向整理作品，按分类、题材与编号高效定位所需素材。</p>' +
+        searchForm("home-q", "输入作品编号、画种、题材或关键词...") + quickTags() +
+        '<div class="hero-meta"><span>作品图库</span><span>分类选稿</span><span>精选作品</span></div></div></div></section>' +
       '<section class="section" data-od-id="home-directory"><div class="container"><div class="section-head"><div><p class="eyebrow">作品分类</p><h2>按画种与题材浏览</h2></div></div><div class="directory"></div></div></section>' +
       '<section class="section section-gallery-stream" data-od-id="home-featured-works"><div class="container"><div class="section-head"><div><h2>全部作品</h2></div></div><div class="recommend-filter home-sort" data-home-sort-group aria-label="首页作品排序"><button class="filter-chip" type="button" aria-pressed="true" data-home-sort="featured">精美作品</button><button class="filter-chip" type="button" aria-pressed="false" data-home-sort="downloads">下载量高</button><button class="filter-chip" type="button" aria-pressed="false" data-home-sort="hot">热门作品</button><button class="filter-chip" type="button" aria-pressed="false" data-home-sort="newest">最新作品</button></div><div class="gallery-grid stream-grid" data-home-stream></div><div class="pagination" data-home-pagination aria-label="首页作品分页"><button class="btn btn-secondary" type="button" data-home-prev>上一页</button><span data-home-status>第 1 / 1 页</span><button class="btn btn-primary" type="button" data-home-next>下一页</button></div></div></section></main>';
   }
@@ -107,13 +108,8 @@
       '<section class="section" data-od-id="category-list-main"><div class="container category-layout"><aside class="side-panel"><p class="eyebrow">分类导航</p><h2><span data-category-parent>国画</span></h2><nav class="side-nav" aria-label="分类切换"></nav></aside><div><div class="toolbar">' + searchForm("list-q", "输入作品编号、题材标签或画面关键词...", true) + '<select class="select" aria-label="排序方式" data-sort-select><option value="custom">综合排序</option><option value="code">编号</option><option value="newest">最新</option><option value="hot">热门</option><option value="downloads">下载量</option></select></div><div class="filter-row" data-filter-group><button class="filter-chip" type="button" aria-pressed="true" data-filter>全部</button></div><p class="small" data-filter-status>当前查看：全部</p><div class="gallery-grid" style="margin-top:28px;" data-category-gallery></div><div class="pagination" data-pagination aria-label="作品分页"><button class="btn btn-secondary" type="button" data-page-prev>上一页</button><span data-page-status>第 1 / 1 页</span><button class="btn btn-primary" type="button" data-page-next>下一页</button></div></div></div></section></main>';
   }
 
-  function competitionMain() {
-    return '<main>' + pageHero("competition-hero", ["首页", "比赛"], "比赛", "按水墨、油画、版画、水彩等比赛方向整理作品，便于围绕赛事题材选图、比稿与编号咨询。", searchForm("competition-q", "搜索：水墨、油画、版画、水彩、作品编号...", true, "competition")) +
-      '<section class="section" data-od-id="competition-main"><div class="container"><div class="section-head competition-filter-head"><div><p class="eyebrow competition-filter-title">比赛作品</p></div></div><div class="filter-row" data-filter-group><button class="filter-chip" type="button" aria-pressed="true" data-competition-filter="">全部</button><button class="filter-chip" type="button" aria-pressed="false" data-competition-filter="ink">水墨</button><button class="filter-chip" type="button" aria-pressed="false" data-competition-filter="oil">油画</button><button class="filter-chip" type="button" aria-pressed="false" data-competition-filter="print">版画</button><button class="filter-chip" type="button" aria-pressed="false" data-competition-filter="watercolor">水彩</button></div><div class="gallery-grid stream-grid" data-home-stream></div><div class="pagination" data-home-pagination aria-label="比赛作品分页"><button class="btn btn-secondary" type="button" data-home-prev>上一页</button><span data-home-status>第 1 / 1 页</span><button class="btn btn-primary" type="button" data-home-next>下一页</button></div></div></section></main>';
-  }
-
   function searchMain() {
-    return '<main>' + pageHero("search-hero", ["首页", "搜索"], "搜索作品", "输入作品编号、画种、题材或展览关键词，定位对应作品与分类。", searchForm("search-q", "搜索：GH-SS-001、国画山水、农民画、比赛作品...", true) + quickTags()) +
+    return '<main>' + pageHero("search-hero", ["首页", "搜索"], "搜索作品", "输入作品编号、画种、题材或展览关键词，定位对应作品与分类。", searchForm("search-q", "搜索：GH-SS-001、国画山水、农民画、作品编号...", true) + quickTags()) +
       '<section class="section" data-od-id="search-results"><div class="container"><div class="section-head"><div><p class="eyebrow">搜索结果</p><h2>关键词：<span data-search-term>国画</span></h2></div></div><div class="result-list" data-search-results></div><div class="pagination" data-pagination aria-label="搜索结果分页"><button class="btn btn-secondary" type="button" data-page-prev>上一页</button><span data-page-status>第 1 / 1 页</span><button class="btn btn-primary" type="button" data-page-next>下一页</button></div></div></section></main>';
   }
 
@@ -123,7 +119,7 @@
 
   function contactMain() {
     return '<main>' + pageHero("contact-hero", ["首页", "联系客服"], "联系客服", "需要确认高清素材、同类作品或使用方式时，请提供作品编号，客服将据此协助处理。") +
-      '<section class="section" data-od-id="contact-main"><div class="container contact-band"><div><p class="eyebrow">客服二维码</p><div class="qr-box">客服二维码</div></div><div><h2>提供作品编号，精准确认所需素材</h2><p class="lead">客服可根据编号定位作品，协助确认高清素材、同类推荐与交付信息。</p><div class="detail-list"><div class="detail-row"><span class="muted">微信号</span><strong data-contact-wechat>aiguozhanhuihua</strong></div><div class="detail-row"><span class="muted">咨询范围</span><span>高清素材、同类作品、编号归档与使用方式</span></div><div class="detail-row"><span class="muted">咨询提示</span><span data-contact-note>建议提供作品编号或页面截图，便于准确确认作品。</span></div></div><div class="contact-actions"><button class="btn btn-primary" type="button" data-copy-wechat="aiguozhanhuihua">复制微信号</button><a class="btn btn-secondary" href="' + appUrl("categories") + '">继续浏览作品</a></div></div></div></section></main>';
+      '<section class="section" data-od-id="contact-main"><div class="container contact-band"><div><p class="eyebrow">客服二维码</p><div class="qr-box">客服二维码</div></div><div><h2>提供作品编号，精准确认所需素材</h2><p class="lead">客服可根据编号定位作品，协助确认高清素材、同类推荐与交付信息。</p><div class="detail-list"><div class="detail-row"><span class="muted">发送内容</span><strong data-contact-send-content>作品编号 / 页面截图 / 学习需求</strong></div><div class="detail-row"><span class="muted">课程学习</span><strong data-contact-course-learning>绘画课程咨询、学习方向与作品参考</strong></div><div class="detail-row"><span class="muted">咨询提示</span><strong data-contact-consultation-tip>请发送作品编号和学习需求，客服将及时协助。</strong></div></div><div class="contact-actions"><button class="btn btn-primary" type="button" data-copy-wechat="aiguozhanhuihua">复制微信号</button><a class="btn btn-secondary" href="' + appUrl("categories") + '">继续浏览作品</a></div></div></div></section></main>';
   }
 
   function commonTail(text) {
@@ -141,8 +137,6 @@
       active = "categories"; main = categoriesMain(); footer = "作品分类与专项归档"; setMode("categories");
     } else if (page === "category") {
       active = "categories"; main = categoryMain(); footer = "分类作品归档"; setMode("category");
-    } else if (page === "competition") {
-      active = "competition"; main = competitionMain(); footer = "比赛作品选稿"; setMode("competition");
     } else if (page === "search") {
       active = "search"; main = searchMain(); footer = "作品编号与分类检索"; setMode("search");
     } else if (page === "detail") {

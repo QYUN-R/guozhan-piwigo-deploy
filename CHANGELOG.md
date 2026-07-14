@@ -1,5 +1,12 @@
 # Guozhan Release History
 
+## guozhan-2026.07.14.6 - 2026-07-14
+
+- Replace the customer-service "consultation scope" row with a concise "course learning" row.
+- Make send content, course learning, and consultation tip copy editable in the custom administrator.
+- Return the three sanitized fields through the public contact API while preserving both customer contacts.
+- Refresh the public JavaScript cache key and advance the administrator plugin to 0.9.5.
+
 ## guozhan-2026.07.13.4 - 2026-07-13
 
 - Restore the versioned Guozhan login stylesheet that was missing from the live server.

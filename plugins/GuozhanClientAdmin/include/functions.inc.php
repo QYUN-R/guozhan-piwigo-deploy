@@ -11,6 +11,9 @@ function gzca_default_config()
     'wechat' => 'aiguozhanhuihua',
     'phone' => '',
     'contact_note' => '咨询高清图、同类作品或使用说明时，请发送作品编号。',
+    'contact_send_content' => '作品编号 / 页面截图 / 学习需求',
+    'contact_course_learning' => '绘画课程咨询、学习方向与作品参考',
+    'contact_consultation_tip' => '请发送作品编号和学习需求，客服将及时协助。',
     'qr_path' => '',
     'contacts' => array(),
     'restrict_administrators' => true,
@@ -448,6 +451,9 @@ function gzca_render_frontend_bridge()
     'note' => $primary_contact['note'],
     'qrUrl' => $primary_contact['qrUrl'],
     'contacts' => $contacts,
+    'sendContent' => $config['contact_send_content'],
+    'courseLearning' => $config['contact_course_learning'],
+    'consultationTip' => $config['contact_consultation_tip'],
     );
   $hero_slides = gzca_frontend_hero_slides($config);
 

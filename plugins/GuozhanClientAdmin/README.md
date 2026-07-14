@@ -1,4 +1,4 @@
-# GuozhanClientAdmin 0.5.2
+# GuozhanClientAdmin 0.9.5
 
 Piwigo 16.4 compatible customer administration plugin for 图物计划国展素材馆。
 
