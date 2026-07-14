@@ -292,9 +292,14 @@ function gzca_record_admin_session($user_id)
   }
 }
 
+function gzca_admin_login_redirect_path()
+{
+  return cookie_path().'admin.php?page=plugin-'.GZCA_ID.'&tab=dashboard';
+}
+
 function gzca_admin_login_url($reason)
 {
-  $redirect_to = cookie_path().'admin.php?page=plugin-'.GZCA_ID.'&tab=dashboard';
+  $redirect_to = gzca_admin_login_redirect_path();
   return get_root_url().'identification.php?'.http_build_query(
     array(
       'redirect' => $redirect_to,
@@ -368,6 +373,11 @@ function gzca_admin_identity()
 function gzca_prepare_login_notice()
 {
   global $page, $template;
+
+  if (empty($_GET['redirect']) && empty($_POST['redirect']))
+  {
+    $template->assign('U_REDIRECT', gzca_admin_login_redirect_path());
+  }
 
   $reason = isset($_GET['gzca_auth']) ? (string)$_GET['gzca_auth'] : '';
   $messages = array(
