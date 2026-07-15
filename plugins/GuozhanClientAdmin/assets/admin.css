@@ -644,6 +644,57 @@ body#theAdminPage .eiw .errors {
   margin: 0;
 }
 
+.gzca-watermark-policy {
+  min-width: 0;
+  display: grid;
+  grid-template-columns: 38px minmax(0, 1fr);
+  align-items: center;
+  gap: 12px;
+  padding: 12px 14px;
+  border: 1px solid rgba(96, 120, 107, .24);
+  border-radius: 6px;
+  background: rgba(96, 120, 107, .08);
+}
+
+.gzca-watermark-policy-mark {
+  width: 34px;
+  height: 34px;
+  display: grid;
+  place-items: center;
+  border-radius: 50%;
+  color: #fff;
+  background: var(--gzca-jade);
+  font-size: 18px;
+  font-weight: 700;
+}
+
+.gzca-watermark-policy strong,
+.gzca-watermark-policy small {
+  display: block;
+}
+
+.gzca-watermark-policy strong {
+  color: var(--gzca-ink);
+  font-size: 13px;
+}
+
+.gzca-watermark-policy small {
+  margin-top: 3px;
+  color: var(--gzca-muted);
+  font-size: 11px;
+  line-height: 1.5;
+}
+
+#pwg_toaster .toast_icon[data-toast-dismiss-ready="1"] {
+  cursor: pointer;
+}
+
+#pwg_toaster .toast_icon[data-toast-dismiss-ready="1"]:focus-visible {
+  outline: 2px solid currentColor;
+  outline-offset: 3px;
+  border-radius: 3px;
+}
+
 .gzca-watermark-toggle {
   min-width: 0;
   display: grid;

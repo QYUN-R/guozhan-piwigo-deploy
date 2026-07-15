@@ -162,29 +162,21 @@
         <div class="gzca-watermark-copy">
           <div class="gzca-panel-head">
             <div><p>图片保护</p><h3>前台水印</h3></div>
-            <span class="gzca-status {if $GZCA_WATERMARK.enabled}is-online{else}is-offline{/if}" data-watermark-status>{if $GZCA_WATERMARK.enabled}已开启{else}已关闭{/if}</span>
+            <span class="gzca-status {if $GZCA_WATERMARK.enabled}is-online{else}is-offline{/if}" data-watermark-status>{if $GZCA_WATERMARK.enabled}固定开启{else}保护异常{/if}</span>
           </div>
-          <p data-watermark-summary>{if $GZCA_WATERMARK.enabled}前台所有作品图片默认使用“{$GZCA_WATERMARK.text|escape:'html'}”透明水印，原图仅在后台保留。{else}前台图片当前不带水印；上传前系统会再次提醒风险。{/if}</p>
+          <p data-watermark-summary>{if $GZCA_WATERMARK.enabled}前台所有作品图片固定使用“{$GZCA_WATERMARK.text|escape:'html'}”透明水印，原图仅在后台保留。{else}水印保护当前异常，系统已阻止新作品上传，避免无水印素材进入前台。{/if}</p>
           {if !$GZCA_WATERMARK.asset_ready}<div class="gzca-watermark-alert"><strong>水印图层缺失</strong><span>已阻止开启水印和新作品上传，请先恢复水印 PNG 文件。</span></div>{/if}
+          {if $GZCA_WATERMARK.asset_ready && !$GZCA_WATERMARK.enabled}<div class="gzca-watermark-alert"><strong>水印配置异常</strong><span>已阻止新作品上传，请联系技术人员恢复水印保护。</span></div>{/if}
         </div>
-        <form class="gzca-watermark-form" action="{$GZCA_URLS.upload|escape:'html'}" method="post" data-watermark-form data-watermark-current="{if $GZCA_WATERMARK.enabled}1{else}0{/if}">
-          <input type="hidden" name="pwg_token" value="{$GZCA_TOKEN|escape:'html'}">
-          <input type="hidden" name="gzca_action" value="set_watermark">
-          <input type="hidden" name="watermark_disable_confirmed" value="0" data-watermark-disable-confirmed>
-          <input type="hidden" name="watermark_disable_confirmed_again" value="0" data-watermark-disable-confirmed-again>
-          <label class="gzca-watermark-toggle">
-            <input type="checkbox" name="watermark_enabled" value="1" {if $GZCA_WATERMARK.enabled}checked{/if} {if !$GZCA_WATERMARK.asset_ready}disabled{/if} data-watermark-toggle>
-            <span class="gzca-toggle-track" aria-hidden="true"><span></span></span>
-            <span><strong>默认给前台图片加水印</strong><small>关闭会影响所有现有和后续作品，需要两次确认。</small></span>
-          </label>
-          <button class="gzca-button gzca-button-primary" type="submit" {if !$GZCA_WATERMARK.asset_ready}disabled{/if} data-watermark-save>保存水印设置</button>
-        </form>
+        <div class="gzca-watermark-policy" aria-label="前台水印固定开启">
+          <span class="gzca-watermark-policy-mark" aria-hidden="true">✓</span>
+          <span><strong>水印保护已锁定</strong><small>不再提供关闭入口；水印异常时会直接阻止上传。</small></span>
+        </div>
       </section>
 
       <form class="gzca-form-layout" action="{$GZCA_URLS.upload|escape:'html'}" method="post" enctype="multipart/form-data" data-upload-form data-watermark-enabled="{if $GZCA_WATERMARK.enabled}1{else}0{/if}">
         <input type="hidden" name="pwg_token" value="{$GZCA_TOKEN|escape:'html'}">
         <input type="hidden" name="gzca_action" value="upload_works">
-        <input type="hidden" name="watermark_upload_confirmed" value="0" data-watermark-upload-confirmed>
 
         <section class="gzca-panel gzca-upload-panel">
           <div class="gzca-panel-head"><div><p>第一步</p><h3>选择作品图片</h3></div><span class="gzca-help">自动分批上传</span></div>

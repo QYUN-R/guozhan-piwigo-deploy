@@ -223,34 +223,18 @@ if ('import_sample_works' === $action)
 
 if ('set_watermark' === $action)
 {
-  $watermark_enabled = isset($_POST['watermark_enabled']) && '1' === (string)$_POST['watermark_enabled'];
-  $disable_confirmed = isset($_POST['watermark_disable_confirmed']) && '1' === (string)$_POST['watermark_disable_confirmed'];
-  $disable_confirmed_again = isset($_POST['watermark_disable_confirmed_again']) && '1' === (string)$_POST['watermark_disable_confirmed_again'];
   $watermark_error = '';
   $watermark_changed = false;
 
-  if (!$watermark_enabled && (!$disable_confirmed || !$disable_confirmed_again))
+  if (gzca_set_frontend_watermark(true, $watermark_error, $watermark_changed))
   {
-    $page['errors'][] = '关闭全站前台水印必须完成两次确认，本次设置未改变。';
-  }
-  elseif (gzca_set_frontend_watermark($watermark_enabled, $watermark_error, $watermark_changed))
-  {
-    if ($watermark_enabled)
-    {
-      $page['infos'][] = $watermark_changed
-        ? '前台水印已开启，现有作品图片已安全重建，后续作品也会使用水印版本。'
-        : '前台水印已经开启，设置无需变更。';
-    }
-    else
-    {
-      $page['infos'][] = $watermark_changed
-        ? '前台水印已关闭，现有作品图片已安全重建。下次上传前系统仍会提醒无水印风险。'
-        : '前台水印已处于关闭状态。';
-    }
+    $page['infos'][] = $watermark_changed
+      ? '前台水印保护已恢复，现有和后续作品都会使用水印版本。'
+      : '前台水印为固定保护策略，当前已经开启。';
   }
   else
   {
-    $page['errors'][] = $watermark_error ?: '前台水印设置失败，设置未改变。';
+    $page['errors'][] = $watermark_error ?: '前台水印保护恢复失败，已继续阻止无水印上传。';
   }
 }
 
@@ -262,7 +246,6 @@ if ('upload_works' === $action)
     : '';
   $publish_now = isset($_POST['publish_now']) && '1' === (string)$_POST['publish_now'];
   $set_cover = isset($_POST['set_cover']);
-  $watermark_upload_confirmed = isset($_POST['watermark_upload_confirmed']) && '1' === (string)$_POST['watermark_upload_confirmed'];
   $uploads = gzca_normalize_uploads(isset($_FILES['artworks']) ? $_FILES['artworks'] : array());
   $async_upload = isset($_POST['gzca_async']) && '1' === (string)$_POST['gzca_async'];
 
@@ -273,8 +256,7 @@ if ('upload_works' === $action)
     $publish_now,
     $set_cover,
     $upload_errors,
-    $code_prefix,
-    $watermark_upload_confirmed
+    $code_prefix
     );
 
   if ($async_upload)

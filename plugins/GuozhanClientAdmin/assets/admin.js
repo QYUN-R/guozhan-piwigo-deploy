@@ -51,6 +51,58 @@
     setOpen(false);
   }
 
+  function initDismissibleToasts() {
+    var toaster = document.querySelector("#pwg_toaster");
+    if (!toaster) return;
+
+    function decorate(toast) {
+      if (!toast || toast.classList.contains("template-pwg-toaster")) return;
+      var icon = toast.querySelector(".toast_icon");
+      if (!icon || icon.getAttribute("data-toast-dismiss-ready") === "1") return;
+      icon.setAttribute("data-toast-dismiss-ready", "1");
+      icon.setAttribute("role", "button");
+      icon.setAttribute("tabindex", "0");
+      icon.setAttribute("aria-label", "关闭提示");
+      icon.setAttribute("title", "关闭提示");
+    }
+
+    function dismiss(icon) {
+      var toast = icon && icon.closest ? icon.closest(".toast") : null;
+      if (!toast) return;
+      if (window.jQuery) {
+        window.jQuery(toast).stop(true, true).fadeOut(120, function () { toast.remove(); });
+      }
+      else {
+        toast.remove();
+      }
+    }
+
+    Array.prototype.forEach.call(toaster.querySelectorAll(".toast"), decorate);
+    toaster.addEventListener("click", function (event) {
+      var icon = event.target.closest && event.target.closest(".toast_icon[data-toast-dismiss-ready='1']");
+      if (icon) dismiss(icon);
+    });
+    toaster.addEventListener("keydown", function (event) {
+      if (event.key !== "Enter" && event.key !== " ") return;
+      var icon = event.target.closest && event.target.closest(".toast_icon[data-toast-dismiss-ready='1']");
+      if (!icon) return;
+      event.preventDefault();
+      dismiss(icon);
+    });
+
+    if (window.MutationObserver) {
+      new MutationObserver(function (mutations) {
+        mutations.forEach(function (mutation) {
+          Array.prototype.forEach.call(mutation.addedNodes || [], function (node) {
+            if (!node || node.nodeType !== 1) return;
+            if (node.matches && node.matches(".toast")) decorate(node);
+            Array.prototype.forEach.call(node.querySelectorAll ? node.querySelectorAll(".toast") : [], decorate);
+          });
+        });
+      }).observe(toaster, { childList: true, subtree: true });
+    }
+  }
+
   function selectedUploadBatchSize(control) {
     var value = parseInt(control && control.value, 10);
     return [20, 30, 40, 50].indexOf(value) !== -1 ? value : 20;
@@ -122,7 +174,6 @@
     var progressBar = document.querySelector("[data-upload-progress-bar]");
     var progressLog = document.querySelector("[data-upload-progress-log]");
     var batchSizeControl = document.querySelector("[data-upload-batch-size]");
-    var watermarkUploadConfirmed = form ? form.querySelector("[data-watermark-upload-confirmed]") : null;
     var maxBatchBytes = 72 * 1024 * 1024;
 
     function addLog(text, type) {
@@ -219,20 +270,8 @@
           prefix.setCustomValidity("");
         }
 
-        if (form.getAttribute("data-watermark-enabled") !== "1" && (!watermarkUploadConfirmed || watermarkUploadConfirmed.value !== "1")) {
-          openConfirmation({ steps: [{
-            eyebrow: "无水印上传提醒",
-            title: "当前全站前台水印已关闭",
-            body: "继续后，这批作品上传到前台时不会带“图物计划国展素材”水印。",
-            detail: "建议取消上传并先开启水印。只有确认接受图片被直接保存或传播的风险时，才继续无水印上传。",
-            confirmLabel: "仍然无水印上传",
-            tone: "danger"
-          }] }).then(function (confirmed) {
-            if (!confirmed) return;
-            if (watermarkUploadConfirmed) watermarkUploadConfirmed.value = "1";
-            if (typeof form.requestSubmit === "function") form.requestSubmit();
-            else form.submit();
-          });
+        if (form.getAttribute("data-watermark-enabled") !== "1") {
+          showNotice("水印保护暂不可用", "系统已阻止上传，避免无水印作品进入前台。请联系技术人员恢复水印后再上传。");
           return;
         }
 
@@ -242,7 +281,6 @@
         var albumId = category.value;
         var publishNowValue = publishNow && publishNow.checked ? "1" : "0";
         var setCoverRequested = Boolean(setCover && setCover.checked);
-        var watermarkUploadConfirmedValue = watermarkUploadConfirmed ? watermarkUploadConfirmed.value : "";
         var oversized = files.filter(function (file) { return file.size > maxBatchBytes; });
         if (oversized.length) {
           showNotice("单张图片过大", "“" + oversized[0].name + "”超过 72 MB，请先压缩后再上传。");
@@ -272,7 +310,6 @@
             data.append("album_id", albumId);
             data.append("code_prefix", codePrefix);
             data.append("publish_now", publishNowValue);
-            if (watermarkUploadConfirmed) data.append("watermark_upload_confirmed", watermarkUploadConfirmedValue);
             if (setCoverRequested && batchIndex === 0) data.append("set_cover", "1");
             batch.forEach(function (file) { data.append("artworks[]", file, file.name); });
 
@@ -309,51 +346,9 @@
             input.value = "";
             renderFiles(input, list);
           }
-          if (watermarkUploadConfirmed) watermarkUploadConfirmed.value = "0";
         })();
       });
     }
-  }
-
-  function initWatermarkControl() {
-    var panel = document.querySelector("[data-watermark-panel]");
-    var form = document.querySelector("[data-watermark-form]");
-    if (!panel || !form) return;
-
-    var toggle = form.querySelector("[data-watermark-toggle]");
-    var status = panel.querySelector("[data-watermark-status]");
-    var summary = panel.querySelector("[data-watermark-summary]");
-    var save = form.querySelector("[data-watermark-save]");
-    var confirmed = form.querySelector("[data-watermark-disable-confirmed]");
-    var confirmedAgain = form.querySelector("[data-watermark-disable-confirmed-again]");
-    var currentEnabled = form.getAttribute("data-watermark-current") === "1";
-
-    function render() {
-      if (!toggle) return;
-      var desiredEnabled = toggle.checked;
-      var changed = desiredEnabled !== currentEnabled;
-      panel.classList.toggle("is-disabled", !desiredEnabled);
-      panel.classList.toggle("is-pending", changed);
-      if (status) {
-        status.textContent = changed ? (desiredEnabled ? "准备开启" : "准备关闭") : (desiredEnabled ? "已开启" : "已关闭");
-        status.classList.toggle("is-online", desiredEnabled);
-        status.classList.toggle("is-offline", !desiredEnabled);
-      }
-      if (summary) {
-        summary.textContent = desiredEnabled
-          ? "保存后，前台所有现有和后续作品图片都会使用透明水印版本，原图仅在后台保留。"
-          : "关闭会影响全站现有和后续作品；保存时必须连续完成两次确认。";
-      }
-      if (save) {
-        save.textContent = changed ? "保存水印设置" : "水印设置已保存";
-        if (!toggle.disabled) save.disabled = !changed;
-      }
-      if (confirmed) confirmed.value = "0";
-      if (confirmedAgain) confirmedAgain.value = "0";
-    }
-
-    if (toggle) toggle.addEventListener("change", render);
-    render();
   }
 
   var confirmationLayer = null;
@@ -912,8 +907,8 @@
 
   document.addEventListener("DOMContentLoaded", function () {
     initMobileNavigation();
+    initDismissibleToasts();
     initUpload();
-    initWatermarkControl();
     initBulkWorks();
     initConfirmations();
     initCompetitionForm();

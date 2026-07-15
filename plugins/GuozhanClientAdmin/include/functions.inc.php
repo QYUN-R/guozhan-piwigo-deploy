@@ -47,6 +47,7 @@ function gzca_init()
   $conf['gzca_config'] = array_merge(gzca_default_config(), $conf['gzca_config']);
   $conf['gzca_config']['restrict_administrators'] = true;
   $conf['gzca_config']['admin_login_whitelist_enabled'] = true;
+  $conf['gzca_config']['watermark_enabled'] = true;
 
   if (function_exists('gzca_enforce_guest_media_policy'))
   {
@@ -2671,16 +2672,8 @@ function gzca_upload_works_batch(
   $result['watermark_enabled'] = !empty($watermark_state['enabled']);
   if (empty($watermark_state['enabled']))
   {
-    if (!empty($watermark_state['requested_enabled']))
-    {
-      $errors[] = '前台水印处于异常状态，已阻止上传。请先确认水印图层存在并重新开启水印。';
-      return $result;
-    }
-    if (empty($watermark_upload_confirmed))
-    {
-      $errors[] = '当前全站前台水印已关闭，请确认无水印上传风险后再继续。';
-      return $result;
-    }
+    $errors[] = '前台水印保护处于异常状态，已阻止上传，避免无水印作品进入前台。请联系技术人员恢复水印后再上传。';
+    return $result;
   }
 
   if (!function_exists('add_uploaded_file'))
