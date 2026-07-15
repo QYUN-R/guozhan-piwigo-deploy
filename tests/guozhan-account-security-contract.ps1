@@ -117,11 +117,11 @@ if ($functions -notmatch 'function\s+gzca_redirect_admin_profile_to_security\s*\
     $failures.Add('Whitelisted administrators are not redirected away from the unsafe native profile editor.')
 }
 if ($functions -notmatch 'function\s+gzca_block_admin_security_ws_bypass\s*\(' -or
-    $functions -notmatch 'pwg\.users\.setMyInfo' -or
-    $functions -notmatch 'pwg\.users\.setInfo' -or
-    $functions -notmatch 'pwg\.users\.generatePasswordLink' -or
+    $functions -notmatch "0\s*===\s*strpos\(\`$method_name,\s*'gzca\.'\)" -or
+    $functions -notmatch 'pwg\.session\.getStatus' -or
+    $functions -notmatch 'pwg\.session\.logout' -or
     $functions -notmatch 'new\s+PwgError\s*\(\s*403') {
-    $failures.Add('Whitelisted administrators can still bypass email verification through native user WebServices.')
+    $failures.Add('Customer administrators are not restricted to the Guozhan WebService allowlist.')
 }
 if ($admin -notmatch "'security'" -or
     $admin -notmatch "'send_bind_email_code'" -or

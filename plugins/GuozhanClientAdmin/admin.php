@@ -438,6 +438,10 @@ if ('bulk_works' === $action)
   {
     $page['errors'][] = '一次最多批量处理 500 张作品，请缩小筛选范围后分批操作。';
   }
+  elseif (!gzca_all_images_managed($selected_ids))
+  {
+    $page['errors'][] = '所选内容包含未纳管图片，已拒绝整批操作。';
+  }
   elseif (!in_array($bulk_action, array('online', 'offline', 'move', 'delete'), true))
   {
     $page['errors'][] = '请选择要执行的批量操作。';
@@ -664,9 +668,9 @@ if ('create_category' === $action)
   {
     $page['errors'][] = '编号前缀“'.$prefix.'”已经被其他板块使用。';
   }
-  elseif (!empty($parent_id) && !gzca_category_exists($parent_id))
+  elseif (!empty($parent_id) && !gzca_managed_category_exists($parent_id))
   {
-    $page['errors'][] = '上级分类不存在。';
+    $page['errors'][] = '上级分类不存在或不属于国展客户后台。';
   }
   else
   {
@@ -709,9 +713,9 @@ if ('save_category' === $action)
   $category_kind = isset($_POST['category_kind']) && 'exhibition' === $_POST['category_kind'] ? 'exhibition' : 'catalog';
   $reserved = isset($_POST['reserved']);
 
-  if (!gzca_category_exists($category_id))
+  if (!gzca_managed_category_exists($category_id))
   {
-    $page['errors'][] = '分类不存在或已被删除。';
+    $page['errors'][] = '分类不存在、已被删除或不属于国展客户后台。';
   }
   elseif ('' === $name)
   {

@@ -2,6 +2,36 @@
 
 defined('PHPWG_ROOT_PATH') or die('Hacking attempt!');
 
+function gzca_enforce_guest_media_policy()
+{
+  global $conf, $user;
+
+  if (!is_array($user) || empty($user['id']))
+  {
+    return;
+  }
+
+  $guest_id = isset($conf['guest_id']) ? (int)$conf['guest_id'] : 0;
+  $is_guest = function_exists('is_a_guest')
+    ? is_a_guest()
+    : ($guest_id > 0 && (int)$user['id'] === $guest_id);
+  if (!$is_guest)
+  {
+    return;
+  }
+
+  $enabled_high = isset($user['enabled_high'])
+    && !in_array($user['enabled_high'], array(false, 0, '0', 'false', ''), true);
+  $user['enabled_high'] = false;
+
+  if ($enabled_high && defined('USER_INFOS_TABLE'))
+  {
+    pwg_query(
+      "UPDATE ".USER_INFOS_TABLE." SET enabled_high = 'false' WHERE user_id = ".(int)$user['id'].";"
+      );
+  }
+}
+
 function gzca_normalize_email($email)
 {
   return strtolower(trim((string)$email));
@@ -267,17 +297,33 @@ function gzca_block_admin_security_ws_bypass($allowed, $method_name, $params)
     return $allowed;
   }
 
-  $blocked_methods = array(
-    'pwg.users.setMyInfo',
-    'pwg.users.setInfo',
-    'pwg.users.generatePasswordLink',
+  $method_name = (string)$method_name;
+  $allowed_methods = array(
+    'pwg.session.getStatus',
+    'pwg.session.logout',
     );
-  if (in_array((string)$method_name, $blocked_methods, true))
+  if (0 === strpos($method_name, 'gzca.') || in_array($method_name, $allowed_methods, true))
   {
-    return new PwgError(403, '管理员邮箱和密码只能在客户后台“账号安全”中完成验证后修改。');
+    return $allowed;
   }
 
-  return $allowed;
+  return new PwgError(403, '客户管理员只能调用国展只读接口，原生管理 WebService 已被安全策略阻止。');
+}
+
+function gzca_revoke_admin_api_keys($user_id)
+{
+  $user_id = (int)$user_id;
+  if ($user_id <= 0 || !defined('USER_AUTH_KEYS_TABLE'))
+  {
+    return false;
+  }
+
+  pwg_query('UPDATE '.USER_AUTH_KEYS_TABLE.
+    ' SET expired_on = NOW(), revoked_on = COALESCE(revoked_on, NOW())'.
+    ' WHERE user_id = '.$user_id." AND key_type = 'api_key'".
+    ' AND revoked_on IS NULL;'
+    );
+  return true;
 }
 
 function gzca_security_mail_status()
@@ -653,6 +699,8 @@ function gzca_revoke_other_admin_sessions($user_id, &$error='', &$revoked_count=
   WHERE data LIKE \''.$escaped_pattern.'\'
     AND id <> \''.$escaped_session_id.'\'
 ;');
+
+  gzca_revoke_admin_api_keys($user_id);
 
   $_SESSION['gzca_admin_user_id'] = $user_id;
   $_SESSION['gzca_admin_issued_at'] = $revoked_at;

@@ -122,6 +122,10 @@ $file='';
 switch ($_GET['part'])
 {
   case 'e':
+    if (is_a_guest())
+    {
+      do_error(401, 'Guest original download is disabled');
+    }
     if ( $src_image->is_original() and !$user['enabled_high'] )
     {// we have a photo and the user has no access to HD
       $deriv = new DerivativeImage(IMG_XXLARGE, $src_image);

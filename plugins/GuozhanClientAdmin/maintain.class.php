@@ -170,6 +170,13 @@ CREATE TABLE IF NOT EXISTS `'.$admin_security_table.'` (
     {
       conf_update_param('gzca_config', $this->default_config(), true, 'serialize');
     }
+
+    if (defined('USER_INFOS_TABLE') && !empty($conf['guest_id']))
+    {
+      pwg_query(
+        "UPDATE ".USER_INFOS_TABLE." SET enabled_high = 'false' WHERE user_id = ".(int)$conf['guest_id'].";"
+        );
+    }
   }
 
   public function update($old_version, $new_version, &$errors=array())

@@ -359,7 +359,6 @@ body[data-home-page] .section-gallery-stream .container {
     transform: scale(1);
   }
 }
-
 .hero-content {
   position: relative;
   z-index: 1;
@@ -526,42 +525,10 @@ body[data-home-page] .section-gallery-stream .container {
   color: var(--seal);
 }
 
-body[data-competition-page] .competition-filter-head {
-  grid-template-columns: 1fr;
-  margin-bottom: 22px;
-}
 
-body[data-competition-page] .competition-filter-title {
-  color: var(--seal);
-  font-family: var(--font-display);
-  font-size: clamp(40px, 4.6vw, 68px);
-  font-weight: 700;
-  line-height: 1.05;
-  text-transform: none;
-  letter-spacing: 0;
-}
 
-body[data-competition-page] .filter-row {
-  gap: 18px;
-  margin-bottom: 38px;
-}
 
-body[data-competition-page] .filter-chip {
-  min-width: 92px;
-  min-height: 58px;
-  justify-content: center;
-  padding: 0 28px;
-  background: rgba(251, 247, 238, .94);
-  color: rgba(31, 43, 39, .72);
-  font-size: 17px;
-  font-weight: 700;
-  box-shadow: 0 10px 26px rgba(52, 40, 26, .07);
-}
 
-body[data-competition-page] .filter-chip[aria-pressed="true"] {
-  background: rgba(255, 250, 241, .98);
-  box-shadow: inset 0 0 0 1px rgba(169, 70, 47, .36), 0 12px 28px rgba(169, 70, 47, .1);
-}
 
 .hero-meta {
   display: flex;
@@ -1797,17 +1764,6 @@ body[data-contact-page] .page-hero {
     flex: 0 0 auto;
   }
 
-  body[data-competition-page] .filter-row {
-    flex-wrap: nowrap;
-    overflow-x: auto;
-    padding-bottom: 8px;
-    scrollbar-width: thin;
-  }
-
-  body[data-competition-page] .filter-chip {
-    flex: 0 0 auto;
-  }
-
   .toolbar {
     grid-template-columns: 1fr;
   }
@@ -1876,24 +1832,71 @@ body[data-contact-page] .page-hero {
   }
 
   .hero {
-    min-height: 600px;
+    min-height: clamp(440px, 64svh, 500px);
+    align-items: center;
+  }
+
+  @supports not (height: 1svh) {
+    .hero {
+      min-height: clamp(440px, 64vh, 500px);
+    }
   }
 
   .hero-content {
-    padding-block: 72px;
+    padding-block: 42px 36px;
   }
 
   .hero h1,
   .page-hero h1 {
-    font-size: 34px;
+    font-size: clamp(30px, 8.2vw, 34px);
+  }
+
+  .hero h1 {
+    margin-top: 10px;
+  }
+
+  .hero-lead {
+    margin-top: 14px;
+    font-size: 16px;
+    line-height: 1.72;
   }
 
   .hero-search {
-    padding: 12px;
+    margin-top: 24px;
+    padding: 10px;
   }
 
   .search-form {
     grid-template-columns: 1fr;
+    gap: 8px;
+  }
+
+  .search-input {
+    min-height: 48px;
+    padding-inline: 14px;
+    font-size: 15px;
+  }
+
+  .hero .search-form .btn {
+    min-height: 48px;
+    width: 100%;
+  }
+
+  .hero .quick-tags {
+    gap: 8px;
+    margin-top: 10px;
+  }
+
+  .hero .tag {
+    min-height: 30px;
+    padding: 3px 11px;
+    font-size: 13px;
+  }
+
+  .hero-meta {
+    gap: 14px;
+    margin-top: 22px;
+    font-size: 13px;
   }
 
   .home-search-band .hero-search {
@@ -1952,27 +1955,6 @@ body[data-contact-page] .page-hero {
 
   .section-head h2 {
     font-size: 32px;
-  }
-
-  body[data-competition-page] .competition-filter-head {
-    margin-bottom: 18px;
-  }
-
-  body[data-competition-page] .competition-filter-title {
-    font-size: 36px;
-    overflow-wrap: anywhere;
-  }
-
-  body[data-competition-page] .filter-row {
-    gap: 12px;
-    margin-bottom: 30px;
-  }
-
-  body[data-competition-page] .filter-chip {
-    min-width: 78px;
-    min-height: 50px;
-    padding-inline: 20px;
-    font-size: 16px;
   }
 
   body[data-home-page] [data-od-id="home-directory"] {
@@ -2153,5 +2135,35 @@ body[data-contact-page] .page-hero {
 
   .floating-service .service-tip {
     display: none;
+  }
+}
+
+/* mobile work-card code layout 20260713 */
+@media (max-width: 640px) {
+  .work-thumb .code-badge,
+  .result-card .work-thumb .code-badge {
+    display: none;
+  }
+
+  .work-caption-compact {
+    gap: 4px;
+    padding-top: 9px;
+  }
+
+  .work-caption-compact .card-meta,
+  .result-card .work-caption-compact .card-meta {
+    font-size: 14px;
+    line-height: 1.36;
+    white-space: normal;
+    overflow-wrap: anywhere;
+  }
+
+  .work-caption-compact .work-code-line,
+  .result-card .work-caption-compact .work-code-line {
+    max-width: 100%;
+    font-size: clamp(13px, 3.45vw, 15px);
+    line-height: 1.35;
+    overflow-wrap: anywhere;
+    word-break: break-word;
   }
 }

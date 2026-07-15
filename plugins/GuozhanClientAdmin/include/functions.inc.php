@@ -47,6 +47,11 @@ function gzca_init()
   $conf['gzca_config'] = array_merge(gzca_default_config(), $conf['gzca_config']);
   $conf['gzca_config']['restrict_administrators'] = true;
   $conf['gzca_config']['admin_login_whitelist_enabled'] = true;
+
+  if (function_exists('gzca_enforce_guest_media_policy'))
+  {
+    gzca_enforce_guest_media_policy();
+  }
 }
 
 function gzca_config()
@@ -587,6 +592,11 @@ function gzca_record_admin_session($user_id)
   {
     unset($_SESSION['gzca_admin_user_id'], $_SESSION['gzca_admin_issued_at']);
     return;
+  }
+
+  if (function_exists('gzca_revoke_admin_api_keys'))
+  {
+    gzca_revoke_admin_api_keys($user_id);
   }
 
   $manual_issue = isset($GLOBALS['gzca_manual_login_issued_at'])
@@ -1369,9 +1379,9 @@ function gzca_category_tree_ids($category_id)
 function gzca_set_category_hidden($category_id, $hidden, &$error='')
 {
   $category_id = (int)$category_id;
-  if (!gzca_category_exists($category_id))
+  if (!gzca_managed_category_exists($category_id))
   {
-    $error = '分类不存在或已经被删除。';
+    $error = '板块不存在、已经被删除或不属于国展客户后台。';
     return false;
   }
 
@@ -1379,6 +1389,11 @@ function gzca_set_category_hidden($category_id, $hidden, &$error='')
   if (empty($ids))
   {
     $error = '没有找到需要处理的板块。';
+    return false;
+  }
+  if (!gzca_all_categories_managed($ids))
+  {
+    $error = '板块树中包含未纳管分类，已拒绝整批操作。';
     return false;
   }
 
@@ -1410,9 +1425,9 @@ function gzca_delete_category_tree($category_id, &$error='', &$summary=array())
     'image_count' => 0,
     'shared_image_count' => 0,
     );
-  if (!gzca_category_exists($category_id))
+  if (!gzca_managed_category_exists($category_id))
   {
-    $error = '分类不存在或已经被删除。';
+    $error = '板块不存在、已经被删除或不属于国展客户后台。';
     return false;
   }
 
@@ -1420,6 +1435,11 @@ function gzca_delete_category_tree($category_id, &$error='', &$summary=array())
   if (empty($ids))
   {
     $error = '没有找到需要删除的板块。';
+    return false;
+  }
+  if (!gzca_all_categories_managed($ids))
+  {
+    $error = '板块树中包含未纳管分类，已拒绝整批删除。';
     return false;
   }
 
@@ -1545,6 +1565,55 @@ function gzca_category_prefix_exists($prefix, $exclude_category_id=0)
   return (int)$count > 0;
 }
 
+function gzca_managed_category_exists($category_id)
+{
+  $category_id = (int)$category_id;
+  if ($category_id < 1 || !gzca_database_table_exists(GZCA_CATEGORIES_TABLE))
+  {
+    return false;
+  }
+
+  list($count) = pwg_db_fetch_row(pwg_query(
+    'SELECT COUNT(*) FROM '.CATEGORIES_TABLE.' AS c'.
+    ' INNER JOIN '.GZCA_CATEGORIES_TABLE.' AS gc ON gc.category_id = c.id'.
+    ' WHERE c.id = '.$category_id.';'
+    ));
+  return (int)$count > 0;
+}
+
+function gzca_all_categories_managed($category_ids)
+{
+  $category_ids = array_values(array_unique(array_filter(array_map('intval', (array)$category_ids))));
+  if (empty($category_ids) || !gzca_database_table_exists(GZCA_CATEGORIES_TABLE))
+  {
+    return false;
+  }
+
+  $id_sql = implode(',', $category_ids);
+  list($count) = pwg_db_fetch_row(pwg_query(
+    'SELECT COUNT(DISTINCT c.id) FROM '.CATEGORIES_TABLE.' AS c'.
+    ' INNER JOIN '.GZCA_CATEGORIES_TABLE.' AS gc ON gc.category_id = c.id'.
+    ' WHERE c.id IN ('.$id_sql.');'
+    ));
+  return (int)$count === count($category_ids);
+}
+
+function gzca_all_images_managed($image_ids)
+{
+  $image_ids = array_values(array_unique(array_filter(array_map('intval', (array)$image_ids))));
+  if (empty($image_ids) || !gzca_database_table_exists(GZCA_WORKS_TABLE))
+  {
+    return false;
+  }
+
+  $id_sql = implode(',', $image_ids);
+  list($count) = pwg_db_fetch_row(pwg_query(
+    'SELECT COUNT(DISTINCT image_id) FROM '.GZCA_WORKS_TABLE.
+    ' WHERE image_id IN ('.$id_sql.');'
+    ));
+  return (int)$count === count($image_ids);
+}
+
 function gzca_replace_embedded_code($comment, $code)
 {
   $comment = preg_replace('/<!--\s*GZCA_CODE:.*?-->/is', '', (string)$comment);
@@ -1556,9 +1625,9 @@ function gzca_prefix_migration_plan($category_id, $new_prefix, &$error)
   $error = '';
   $category_id = (int)$category_id;
   $new_prefix = gzca_normalize_code($new_prefix);
-  if (!gzca_category_exists($category_id))
+  if (!gzca_managed_category_exists($category_id))
   {
-    $error = '板块不存在或已经被删除。';
+    $error = '板块不存在、已经被删除或不属于国展客户后台。';
     return false;
   }
   if (!gzca_valid_prefix($new_prefix))
@@ -3492,7 +3561,10 @@ function gzca_sync_images_to_single_category($image_ids, $target_category_id)
   $target_category_id = (int)$target_category_id;
   $image_ids = array_values(array_unique(array_filter(array_map('intval', (array)$image_ids))));
   $result = array('old_category_ids' => array(), 'removed_category_ids' => array());
-  if ($target_category_id < 1 || empty($image_ids))
+  if ($target_category_id < 1
+      || empty($image_ids)
+      || !gzca_managed_category_exists($target_category_id)
+      || !gzca_all_images_managed($image_ids))
   {
     return $result;
   }
@@ -3515,6 +3587,15 @@ function gzca_sync_images_to_single_category($image_ids, $target_category_id)
   }
 
   pwg_query('DELETE FROM '.IMAGE_CATEGORY_TABLE.' WHERE image_id IN ('.$id_sql.') AND category_id <> '.$target_category_id.';');
+
+  if (!empty($result['removed_category_ids']))
+  {
+    $removed_sql = implode(',', array_map('intval', array_unique($result['removed_category_ids'])));
+    pwg_query(
+      'UPDATE '.CATEGORIES_TABLE.' SET representative_picture_id = NULL'.
+      ' WHERE id IN ('.$removed_sql.') AND representative_picture_id IN ('.$id_sql.');'
+      );
+  }
 
   $existing_rows = query2array('SELECT image_id FROM '.IMAGE_CATEGORY_TABLE.' WHERE category_id = '.$target_category_id.' AND image_id IN ('.$id_sql.');');
   $existing = array();
@@ -3559,6 +3640,11 @@ function gzca_delete_works($image_ids, &$error='')
   if (empty($image_ids))
   {
     $error = '没有选择要删除的作品。';
+    return false;
+  }
+  if (!gzca_all_images_managed($image_ids))
+  {
+    $error = '所选内容包含未纳管图片，已拒绝整批删除。';
     return false;
   }
 
@@ -3706,6 +3792,10 @@ function gzca_set_category_cover($category_id, $image_id)
 {
   $category_id = (int)$category_id;
   $image_id = (int)$image_id;
+  if (!gzca_managed_category_exists($category_id) || !gzca_all_images_managed(array($image_id)))
+  {
+    return false;
+  }
 
   $query = '
 SELECT COUNT(*)
@@ -3738,7 +3828,7 @@ function gzca_unset_category_cover($category_id, $image_id=0)
 {
   $category_id = (int)$category_id;
   $image_id = (int)$image_id;
-  if ($category_id < 1)
+  if ($category_id < 1 || !gzca_managed_category_exists($category_id))
   {
     return false;
   }
@@ -3787,7 +3877,7 @@ SELECT
     ic.category_id,
     c.name AS category_name
   FROM '.IMAGES_TABLE.' AS i
-    LEFT JOIN '.GZCA_WORKS_TABLE.' AS gw ON gw.image_id = i.id
+    INNER JOIN '.GZCA_WORKS_TABLE.' AS gw ON gw.image_id = i.id
     LEFT JOIN '.IMAGE_CATEGORY_TABLE.' AS ic ON ic.image_id = i.id
       AND ic.category_id = (
         SELECT ic2.category_id
