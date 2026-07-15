@@ -573,6 +573,45 @@
     });
   }
 
+  function createPageJump(pagination, onJump) {
+    if (!pagination || typeof onJump !== "function") return null;
+    let form = pagination.querySelector("[data-page-jump]");
+    if (!form) {
+      form = document.createElement("form");
+      form.className = "page-jump";
+      form.setAttribute("data-page-jump", "");
+      form.innerHTML = '<label><span>跳到</span><input class="page-jump-input" data-page-jump-input type="number" min="1" step="1" inputmode="numeric" aria-label="跳转页码"><span>页</span></label><button class="btn btn-secondary page-jump-button" type="submit" data-page-jump-submit>跳转</button>';
+      pagination.appendChild(form);
+    }
+    const input = form.querySelector("[data-page-jump-input]");
+    const submit = form.querySelector("[data-page-jump-submit]");
+    if (!input || !submit) return null;
+
+    form.onsubmit = (event) => {
+      event.preventDefault();
+      const maxPage = Math.max(1, parseInt(input.max, 10) || 1);
+      const rawPage = parseInt(input.value, 10);
+      if (!Number.isFinite(rawPage)) {
+        input.focus();
+        return;
+      }
+      const targetPage = Math.min(maxPage, Math.max(1, rawPage));
+      input.value = String(targetPage);
+      onJump(targetPage - 1);
+    };
+
+    return {
+      update(currentPage, totalPages, disabled) {
+        const safeTotal = Math.max(1, Number(totalPages) || 1);
+        const safeCurrent = Math.min(safeTotal, Math.max(1, Number(currentPage) + 1 || 1));
+        input.max = String(safeTotal);
+        if (document.activeElement !== input) input.value = String(safeCurrent);
+        input.disabled = Boolean(disabled) || safeTotal <= 1;
+        submit.disabled = Boolean(disabled) || safeTotal <= 1;
+      }
+    };
+  }
+
   function createPagedRenderer(options) {
     const { container, pagination, pageSize, renderItem, afterRender } = options;
     const emptyMessage = options.emptyMessage || "该栏目作品正在整理中";
@@ -582,6 +621,11 @@
     const status = pagination ? pagination.querySelector("[data-page-status], [data-home-status]") : null;
     let items = [];
     let page = 0;
+    const jump = createPageJump(pagination, (targetPage) => {
+      page = targetPage;
+      render();
+      if (container) container.scrollIntoView({ behavior: "smooth", block: "start" });
+    });
 
     function render() {
       if (!container) return;
@@ -593,6 +637,7 @@
       if (status) status.textContent = "第 " + (page + 1) + " / " + totalPages + " 页 · 共 " + items.length + " " + unit;
       if (prev) prev.disabled = page === 0;
       if (next) next.disabled = page >= totalPages - 1;
+      if (jump) jump.update(page, totalPages, false);
     }
 
     if (prev) prev.addEventListener("click", () => {
@@ -630,12 +675,17 @@
     let totalPages = 1;
     let loading = false;
     let generation = 0;
+    const jump = createPageJump(pagination, (targetPage) => {
+      if (loading) return;
+      loadPage(targetPage, true);
+    });
 
     function updatePagination(message) {
       if (status) status.textContent = message || ("第 " + (page + 1) + " / " + totalPages + " 页 · 共 " + totalCount + " " + unit);
       if (prev) prev.disabled = loading || page <= 0;
       if (next) next.disabled = loading || page >= totalPages - 1;
       if (pagination) pagination.setAttribute("aria-busy", loading ? "true" : "false");
+      if (jump) jump.update(page, totalPages, loading);
     }
 
     async function loadPage(targetPage, scrollToContainer) {
@@ -1577,12 +1627,17 @@
     let totalPages = 1;
     let loading = false;
     let generation = 0;
+    const jump = createPageJump(pagination, (targetPage) => {
+      if (loading) return;
+      loadPage(targetPage, true);
+    });
 
     function updatePagination(message) {
       status.textContent = message || ("第 " + (pageNumber + 1) + " / " + totalPages + " 页 · 共 " + totalCount + " 张");
       previous.disabled = loading || pageNumber <= 0;
       next.disabled = loading || pageNumber >= totalPages - 1;
       pagination.setAttribute("aria-busy", loading ? "true" : "false");
+      if (jump) jump.update(pageNumber, totalPages, loading);
     }
 
     async function loadPage(targetPage, scrollToGrid) {
