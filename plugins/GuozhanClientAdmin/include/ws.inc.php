@@ -257,25 +257,13 @@ SELECT
     else
     {
       $thumbnail_derivatives = array();
-      $allowed_thumbnail_derivatives = array(
-        'xsmall' => IMG_XSMALL,
-        'thumb' => IMG_THUMB,
-        'square' => IMG_SQUARE,
-        );
-      foreach ($allowed_thumbnail_derivatives as $derivative_name => $derivative_type)
+      $thumbnail_url = gzca_image_list_url($row);
+      if ('' !== $thumbnail_url && isset($standard_urls['derivatives']['xsmall']))
       {
-        if (isset($standard_urls['derivatives'][$derivative_name]))
-        {
-          $safe_derivative_url = gzca_image_derivative_url($row, $derivative_type);
-          if ('' !== $safe_derivative_url)
-          {
-            $thumbnail_derivatives[$derivative_name] = $standard_urls['derivatives'][$derivative_name];
-            $thumbnail_derivatives[$derivative_name]['url'] = $safe_derivative_url;
-          }
-        }
+        $thumbnail_derivatives['xsmall'] = $standard_urls['derivatives']['xsmall'];
+        $thumbnail_derivatives['xsmall']['url'] = $thumbnail_url;
       }
 
-      $thumbnail_url = gzca_image_list_url($row);
       $safe_urls = array(
         'page_url' => gzca_frontend_url('detail', array('image_id' => (int)$row['id'], 'code' => $code)),
         'thumbnail_url' => $thumbnail_url,

@@ -2440,20 +2440,16 @@ function gzca_next_code_number($prefix)
     $prefix = 'GZ';
   }
 
-  $escaped = pwg_db_real_escape_string($prefix.'-%');
-  $rows = query2array(
-    'SELECT code FROM '.GZCA_WORKS_TABLE.' WHERE code LIKE \''.$escaped.'\';'
-    );
-  $max = 0;
-  foreach ($rows as $row)
-  {
-    if (preg_match('/^'.preg_quote($prefix, '/').'-(\d+)$/', $row['code'], $matches))
-    {
-      $max = max($max, (int)$matches[1]);
-    }
-  }
+  $escaped_prefix = pwg_db_real_escape_string($prefix);
+  $suffix_position = strlen($prefix) + 2;
+  list($max) = pwg_db_fetch_row(pwg_query(
+    'SELECT COALESCE(MAX(CAST(SUBSTRING(code, '.$suffix_position.') AS UNSIGNED)), 0)'.
+    ' FROM '.GZCA_WORKS_TABLE.
+    ' WHERE code LIKE \''.$escaped_prefix.'-%\''.
+    ' AND SUBSTRING(code, '.$suffix_position.') REGEXP \'^[0-9]+$\';'
+    ));
 
-  return $max + 1;
+  return max(0, (int)$max) + 1;
 }
 
 function gzca_code_from_number($prefix, $number)
@@ -2868,63 +2864,66 @@ function gzca_prewarm_image_derivatives($image_ids, $types=null)
     $types = array(IMG_XSMALL, IMG_THUMB, IMG_SQUARE, IMG_XLARGE);
   }
 
-  $rows = query2array('SELECT * FROM '.IMAGES_TABLE.' WHERE id IN ('.implode(',', $image_ids).');');
   $warmed = 0;
-  foreach ($rows as $row)
+  foreach (array_chunk($image_ids, 25) as $image_id_batch)
   {
-    foreach ($types as $type)
+    $rows = query2array('SELECT * FROM '.IMAGES_TABLE.' WHERE id IN ('.implode(',', $image_id_batch).');');
+    foreach ($rows as $row)
     {
-      try
+      foreach ($types as $type)
       {
-        $source = new SrcImage($row);
-        $derivative = DerivativeImage::get_one($type, $source);
-        if (null === $derivative)
+        try
         {
-          continue;
-        }
-        $path = $derivative->get_path();
-        if (is_file($path))
-        {
-          $warmed++;
-          continue;
-        }
+          $source = new SrcImage($row);
+          $derivative = DerivativeImage::get_one($type, $source);
+          if (null === $derivative)
+          {
+            continue;
+          }
+          $path = $derivative->get_path();
+          if (is_file($path))
+          {
+            $warmed++;
+            continue;
+          }
 
-        $url = $derivative->get_url();
-        $marker = 'i.php?';
-        $pos = strpos($url, $marker);
-        if (false === $pos)
-        {
-          continue;
-        }
-        $query = html_entity_decode(substr($url, $pos + strlen($marker)), ENT_QUOTES, 'UTF-8');
-        $query = rawurldecode($query);
-        if ('' === $query || '/' !== $query[0])
-        {
-          continue;
-        }
+          $url = $derivative->get_url();
+          $marker = 'i.php?';
+          $pos = strpos($url, $marker);
+          if (false === $pos)
+          {
+            continue;
+          }
+          $query = html_entity_decode(substr($url, $pos + strlen($marker)), ENT_QUOTES, 'UTF-8');
+          $query = rawurldecode($query);
+          if ('' === $query || '/' !== $query[0])
+          {
+            continue;
+          }
 
-        $php = (defined('PHP_BINARY') && is_executable(PHP_BINARY)) ? PHP_BINARY : '/usr/bin/php';
-        if (!is_executable($php))
-        {
-          $php = 'php';
+          $php = (defined('PHP_BINARY') && is_executable(PHP_BINARY)) ? PHP_BINARY : '/usr/bin/php';
+          if (!is_executable($php))
+          {
+            $php = 'php';
+          }
+          $host = isset($_SERVER['HTTP_HOST']) && '' !== $_SERVER['HTTP_HOST'] ? $_SERVER['HTTP_HOST'] : 'localhost';
+          $cmd = 'cd '.escapeshellarg(PHPWG_ROOT_PATH).' && '.
+            'QUERY_STRING='.escapeshellarg($query).' '.
+            'REQUEST_URI='.escapeshellarg('/i.php?'.$query).' '.
+            'SERVER_PROTOCOL='.escapeshellarg('HTTP/1.1').' '.
+            'HTTP_HOST='.escapeshellarg($host).' '.
+            'REMOTE_ADDR='.escapeshellarg('127.0.0.1').' '.
+            escapeshellarg($php).' i.php > /dev/null 2>&1';
+          @exec($cmd, $unused_output, $exit_code);
+          if (0 === (int)$exit_code && is_file($path))
+          {
+            $warmed++;
+          }
         }
-        $host = isset($_SERVER['HTTP_HOST']) && '' !== $_SERVER['HTTP_HOST'] ? $_SERVER['HTTP_HOST'] : 'localhost';
-        $cmd = 'cd '.escapeshellarg(PHPWG_ROOT_PATH).' && '.
-          'QUERY_STRING='.escapeshellarg($query).' '.
-          'REQUEST_URI='.escapeshellarg('/i.php?'.$query).' '.
-          'SERVER_PROTOCOL='.escapeshellarg('HTTP/1.1').' '.
-          'HTTP_HOST='.escapeshellarg($host).' '.
-          'REMOTE_ADDR='.escapeshellarg('127.0.0.1').' '.
-          escapeshellarg($php).' i.php > /dev/null 2>&1';
-        @exec($cmd, $unused_output, $exit_code);
-        if (0 === (int)$exit_code && is_file($path))
+        catch (Throwable $error)
         {
-          $warmed++;
+          continue;
         }
-      }
-      catch (Throwable $error)
-      {
-        continue;
       }
     }
   }
@@ -2934,29 +2933,65 @@ function gzca_prewarm_image_derivatives($image_ids, $types=null)
 function gzca_prewarm_all_frontend_derivatives(&$error='', &$summary=array())
 {
   $error = '';
-  $types = array(IMG_XSMALL, IMG_THUMB, IMG_SQUARE, IMG_XLARGE);
-  $rows = query2array('SELECT * FROM '.IMAGES_TABLE.' ORDER BY id;');
-  $image_ids = array_map('intval', array_column($rows, 'id'));
-  $expected = count($image_ids) * count($types);
-  $warmed = empty($image_ids) ? 0 : gzca_prewarm_image_derivatives($image_ids, $types);
-  $public_expected = count($image_ids) * 2;
+  $types = array(IMG_XSMALL, IMG_XLARGE);
+  $batch_size = 25;
+  list($max_image_id, $image_count) = pwg_db_fetch_row(pwg_query(
+    'SELECT COALESCE(MAX(id), 0), COUNT(*) FROM '.IMAGES_TABLE.';'
+    ));
+  $max_image_id = (int)$max_image_id;
+  $image_count = (int)$image_count;
+  $expected = $image_count * count($types);
+  $warmed = 0;
+  $last_image_id = 0;
+  while ($last_image_id < $max_image_id)
+  {
+    $id_rows = query2array(
+      'SELECT id FROM '.IMAGES_TABLE.
+      ' WHERE id > '.$last_image_id.' AND id <= '.$max_image_id.
+      ' ORDER BY id LIMIT '.$batch_size.';'
+      );
+    if (empty($id_rows))
+    {
+      break;
+    }
+    $image_ids = array_map('intval', array_column($id_rows, 'id'));
+    $warmed += gzca_prewarm_image_derivatives($image_ids, $types);
+    $last_image_id = max($image_ids);
+  }
+
+  $public_expected = $image_count * count($types);
   $public_ready = 0;
   if ($warmed === $expected)
   {
-    foreach ($rows as $row)
+    $last_image_id = 0;
+    while ($last_image_id < $max_image_id)
     {
-      foreach (array(IMG_XSMALL, IMG_XLARGE) as $type)
+      $rows = query2array(
+        'SELECT * FROM '.IMAGES_TABLE.
+        ' WHERE id > '.$last_image_id.' AND id <= '.$max_image_id.
+        ' ORDER BY id LIMIT '.$batch_size.';'
+        );
+      if (empty($rows))
       {
-        $url = gzca_image_derivative_url($row, $type);
-        if (gzca_frontend_public_image_url_is_ready($url))
+        break;
+      }
+      foreach ($rows as $row)
+      {
+        foreach ($types as $type)
         {
-          $public_ready++;
+          $url = gzca_image_derivative_url($row, $type);
+          if (gzca_frontend_public_image_url_is_ready($url))
+          {
+            $public_ready++;
+          }
         }
       }
+      $last_row = end($rows);
+      $last_image_id = (int)$last_row['id'];
     }
   }
   $summary = array(
-    'images' => count($image_ids),
+    'images' => $image_count,
     'types' => count($types),
     'expected' => $expected,
     'warmed' => $warmed,

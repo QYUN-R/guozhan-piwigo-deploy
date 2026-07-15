@@ -5,6 +5,7 @@
   const BRAND_EN = "AI Graphics Learning Plan";
   const WECHAT = "aiguozhanhuihua";
   const HOME_PAGE_SIZE = 16;
+  const LIST_PAGE_SIZE = 16;
 
   const categories = {
     "ink-landscape": cat("国画", "山水画", "国画山水画", "GH-SS", ["山水", "云壑", "溪桥", "松石"]),
@@ -614,6 +615,75 @@
         render();
       }
     };
+  }
+
+  function createRemotePagedRenderer(options) {
+    const { container, pagination, pageSize, renderItem, fetchPage, afterRender, onPageLoaded } = options;
+    const emptyMessage = options.emptyMessage || "该栏目作品正在整理中";
+    const errorMessage = options.errorMessage || "作品加载失败，请稍后重试";
+    const unit = options.unit || "张";
+    const prev = pagination ? pagination.querySelector("[data-page-prev], [data-home-prev]") : null;
+    const next = pagination ? pagination.querySelector("[data-page-next], [data-home-next]") : null;
+    const status = pagination ? pagination.querySelector("[data-page-status], [data-home-status]") : null;
+    let page = 0;
+    let totalCount = 0;
+    let totalPages = 1;
+    let loading = false;
+    let generation = 0;
+
+    function updatePagination(message) {
+      if (status) status.textContent = message || ("第 " + (page + 1) + " / " + totalPages + " 页 · 共 " + totalCount + " " + unit);
+      if (prev) prev.disabled = loading || page <= 0;
+      if (next) next.disabled = loading || page >= totalPages - 1;
+      if (pagination) pagination.setAttribute("aria-busy", loading ? "true" : "false");
+    }
+
+    async function loadPage(targetPage, scrollToContainer) {
+      if (!container) return;
+      const requestedPage = Math.max(0, Number(targetPage) || 0);
+      const expectedGeneration = ++generation;
+      let finalMessage = "";
+      loading = true;
+      container.setAttribute("aria-busy", "true");
+      updatePagination("正在加载第 " + (requestedPage + 1) + " 页…");
+
+      try {
+        const result = await fetchPage(requestedPage);
+        if (expectedGeneration !== generation) return;
+        const items = Array.isArray(result?.items) ? result.items : [];
+        totalCount = Math.max(0, Number(result?.totalCount ?? items.length) || 0);
+        totalPages = Math.max(1, Math.ceil(totalCount / pageSize));
+        page = Math.min(requestedPage, totalPages - 1);
+        container.innerHTML = items.length
+          ? items.map((item, index) => renderItem(item, index)).join("")
+          : '<div class="empty-state">' + emptyMessage + '</div>';
+        if (afterRender) afterRender(container);
+        if (onPageLoaded) onPageLoaded({ items, page, totalCount, totalPages });
+        if (scrollToContainer) container.scrollIntoView({ behavior: "smooth", block: "start" });
+      } catch (error) {
+        if (expectedGeneration !== generation) return;
+        console.error(options.errorLog || "Guozhan paged works API unavailable", error);
+        container.innerHTML = '<div class="empty-state">' + errorMessage + '</div>';
+        finalMessage = "作品加载失败";
+      } finally {
+        if (expectedGeneration === generation) {
+          loading = false;
+          container.setAttribute("aria-busy", "false");
+          updatePagination(finalMessage);
+        }
+      }
+    }
+
+    if (prev) prev.addEventListener("click", () => {
+      if (loading || page <= 0) return;
+      loadPage(page - 1, true);
+    });
+    if (next) next.addEventListener("click", () => {
+      if (loading || page >= totalPages - 1) return;
+      loadPage(page + 1, true);
+    });
+
+    return { loadPage };
   }
 
   function buildWork(data, key, index, scoreIndex) {
@@ -1415,7 +1485,7 @@
     while (all.length < maxItems) {
       const result = await apiFetch("gzca.images.getList", {
         ...options,
-        per_page: API_PAGE_SIZE,
+        per_page: Math.min(API_PAGE_SIZE, maxItems - all.length),
         page
       });
       const images = result.images || [];
@@ -1583,10 +1653,7 @@
     const context = await getCategoryContext();
     const filterRow = document.querySelector("[data-filter-group]");
     const sortSelect = document.querySelector("[data-sort-select]");
-    const filters = context.isCaaBoard ? [] : (context.data.direct ? ["全部"] : ["全部"].concat(context.data.tags || []));
-    let allWorks = [];
     let currentSort = sortSelect?.value || "custom";
-    let reloadGeneration = 0;
 
     document.title = context.title + " · " + BRAND_NAME;
     document.querySelectorAll("[data-category-parent]").forEach((node) => { node.textContent = context.parentName; });
@@ -1604,61 +1671,45 @@
       filterRow.innerHTML = "";
     }
 
-    const pager = createPagedRenderer({
+    const pager = createRemotePagedRenderer({
       container: document.querySelector("[data-category-gallery]"),
       pagination: document.querySelector("[data-pagination]"),
-      pageSize: 16,
-      renderItem: (item) => renderWorkCard(item),
+      pageSize: LIST_PAGE_SIZE,
+      renderItem: (item, index) => renderWorkCard(item, null, { eager: index < 4 }),
       emptyMessage: context.data.reserved ? "该专项展览作品正在整理中" : "未找到符合当前条件的作品",
-      unit: "张"
-    });
-
-    function update() {
-      const active = "全部";
-      const filtered = allWorks;
-      const sorted = sortedWorks(filtered, currentSort);
-      pager.setItems(sorted);
-      const status = document.querySelector("[data-filter-status]");
-      if (status) {
-        const singleNote = sorted.length <= 1 ? "（当前作品数量不足，排序结果不会明显变化）" : "";
-        status.textContent = "当前查看：" + (active || "全部") + " · 排序：" + sortLabel(currentSort) + singleNote;
-      }
-    }
-
-    async function reload() {
-      const expectedGeneration = ++reloadGeneration;
-      const requestedSort = sortSelect?.value || "custom";
-      currentSort = requestedSort;
-      update();
-      try {
-        const query = { sort: requestedSort, recursive: true, fallbackKey: context.key };
+      unit: "张",
+      errorLog: "Guozhan category works API unavailable",
+      fetchPage: async (page) => {
+        const query = {
+          sort: currentSort,
+          recursive: true,
+          per_page: LIST_PAGE_SIZE,
+          page
+        };
         if (context.apiCategory?.id) {
           query.cat_id = context.apiCategory.id;
         }
         else if (context.isCaaBoard) query.query = "ZX-";
         else query.query = context.title;
-        const works = await fetchApiWorks(query, 100);
-        if (expectedGeneration !== reloadGeneration) return;
-        allWorks = works;
-      } catch (error) {
-        if (expectedGeneration !== reloadGeneration) return;
-        console.error("Guozhan category works API unavailable", error);
-        allWorks = [];
+        const result = await apiFetch("gzca.images.getList", query);
+        const items = (result.images || []).map((image) => normalizeApiWork(image, context.key));
+        return {
+          items,
+          totalCount: Number(result.paging?.total_count ?? items.length)
+        };
+      },
+      onPageLoaded: ({ totalCount }) => {
+        const status = document.querySelector("[data-filter-status]");
+        if (!status) return;
+        const singleNote = totalCount <= 1 ? "（当前作品数量不足，排序结果不会明显变化）" : "";
+        status.textContent = "当前查看：全部 · 排序：" + sortLabel(currentSort) + singleNote;
       }
-      update();
-    }
-
-    if (filterRow) {
-      filterRow.querySelectorAll("[data-filter]").forEach((button) => {
-        button.addEventListener("click", () => {
-          filterRow.querySelectorAll("[data-filter]").forEach((item) => item.setAttribute("aria-pressed", "false"));
-          button.setAttribute("aria-pressed", "true");
-          update();
-        });
-      });
-    }
-    sortSelect?.addEventListener("change", reload);
-    await reload();
+    });
+    sortSelect?.addEventListener("change", () => {
+      currentSort = sortSelect.value || "custom";
+      pager.loadPage(0, false);
+    });
+    await pager.loadPage(0, false);
   }
 
   async function applySearchPage() {
@@ -1667,21 +1718,29 @@
     document.querySelectorAll("[data-search-term]").forEach((node) => { node.textContent = query || "全部作品"; });
     const input = document.querySelector("[data-search-form] input[name='q']");
     if (input) input.value = query;
-    const pager = createPagedRenderer({
+    const pager = createRemotePagedRenderer({
       container: document.querySelector("[data-search-results]"),
       pagination: document.querySelector("[data-pagination]"),
-      pageSize: 16,
+      pageSize: LIST_PAGE_SIZE,
       renderItem: renderResultCard,
       emptyMessage: query ? "未找到该作品，可能已下架或不存在" : "暂无可展示作品",
-      unit: "条"
+      unit: "条",
+      errorLog: "Guozhan search API unavailable",
+      fetchPage: async (page) => {
+        const result = await apiFetch("gzca.images.getList", {
+          query,
+          sort: query ? "custom" : "featured",
+          per_page: LIST_PAGE_SIZE,
+          page
+        });
+        const items = (result.images || []).map((image) => normalizeApiWork(image));
+        return {
+          items,
+          totalCount: Number(result.paging?.total_count ?? items.length)
+        };
+      }
     });
-    try {
-      const works = await fetchApiWorks({ query, sort: query ? "custom" : "featured" }, 100);
-      pager.setItems(works);
-    } catch (error) {
-      console.error("Guozhan search API unavailable", error);
-      pager.setItems([]);
-    }
+    await pager.loadPage(0, false);
   }
 
   function setTextAll(selector, value) {
