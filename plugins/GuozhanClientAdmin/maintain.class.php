@@ -19,6 +19,7 @@ class GuozhanClientAdmin_maintain extends PluginMaintain
       'qr_path' => '',
       'restrict_administrators' => true,
       'frontend_sync' => true,
+      'watermark_enabled' => true,
       );
   }
 

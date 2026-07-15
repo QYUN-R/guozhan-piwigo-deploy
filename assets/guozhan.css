@@ -1118,16 +1118,39 @@ body[data-home-page] .section-gallery-stream .section-head {
 
 .stream-grid .work-card {
   min-width: 0;
+  content-visibility: auto;
+  contain-intrinsic-size: 360px;
 }
 
 .stream-sentinel {
   min-height: 72px;
-  display: grid;
+  display: flex;
   place-items: center;
+  align-items: center;
+  justify-content: center;
+  gap: 14px;
   margin-top: 34px;
   border-top: 1px solid var(--line);
   color: var(--muted);
   font-size: 14px;
+}
+
+.stream-sentinel[aria-busy="true"]::before {
+  width: 16px;
+  height: 16px;
+  border: 2px solid var(--line);
+  border-top-color: var(--seal);
+  border-radius: 50%;
+  content: "";
+  animation: stream-loading 720ms linear infinite;
+}
+
+.stream-sentinel.is-complete {
+  min-height: 54px;
+}
+
+@keyframes stream-loading {
+  to { transform: rotate(360deg); }
 }
 
 .pagination {

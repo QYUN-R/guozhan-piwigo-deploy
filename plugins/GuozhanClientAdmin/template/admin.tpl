@@ -158,9 +158,33 @@
     {/if}
 
     {if $GZCA_TAB eq 'upload'}
-      <form class="gzca-form-layout" action="{$GZCA_URLS.upload|escape:'html'}" method="post" enctype="multipart/form-data" data-upload-form>
+      <section class="gzca-panel gzca-watermark-panel {if !$GZCA_WATERMARK.enabled}is-disabled{/if}" data-watermark-panel>
+        <div class="gzca-watermark-copy">
+          <div class="gzca-panel-head">
+            <div><p>图片保护</p><h3>前台水印</h3></div>
+            <span class="gzca-status {if $GZCA_WATERMARK.enabled}is-online{else}is-offline{/if}" data-watermark-status>{if $GZCA_WATERMARK.enabled}已开启{else}已关闭{/if}</span>
+          </div>
+          <p data-watermark-summary>{if $GZCA_WATERMARK.enabled}前台所有作品图片默认使用“{$GZCA_WATERMARK.text|escape:'html'}”透明水印，原图仅在后台保留。{else}前台图片当前不带水印；上传前系统会再次提醒风险。{/if}</p>
+          {if !$GZCA_WATERMARK.asset_ready}<div class="gzca-watermark-alert"><strong>水印图层缺失</strong><span>已阻止开启水印和新作品上传，请先恢复水印 PNG 文件。</span></div>{/if}
+        </div>
+        <form class="gzca-watermark-form" action="{$GZCA_URLS.upload|escape:'html'}" method="post" data-watermark-form data-watermark-current="{if $GZCA_WATERMARK.enabled}1{else}0{/if}">
+          <input type="hidden" name="pwg_token" value="{$GZCA_TOKEN|escape:'html'}">
+          <input type="hidden" name="gzca_action" value="set_watermark">
+          <input type="hidden" name="watermark_disable_confirmed" value="0" data-watermark-disable-confirmed>
+          <input type="hidden" name="watermark_disable_confirmed_again" value="0" data-watermark-disable-confirmed-again>
+          <label class="gzca-watermark-toggle">
+            <input type="checkbox" name="watermark_enabled" value="1" {if $GZCA_WATERMARK.enabled}checked{/if} {if !$GZCA_WATERMARK.asset_ready}disabled{/if} data-watermark-toggle>
+            <span class="gzca-toggle-track" aria-hidden="true"><span></span></span>
+            <span><strong>默认给前台图片加水印</strong><small>关闭会影响所有现有和后续作品，需要两次确认。</small></span>
+          </label>
+          <button class="gzca-button gzca-button-primary" type="submit" {if !$GZCA_WATERMARK.asset_ready}disabled{/if} data-watermark-save>保存水印设置</button>
+        </form>
+      </section>
+
+      <form class="gzca-form-layout" action="{$GZCA_URLS.upload|escape:'html'}" method="post" enctype="multipart/form-data" data-upload-form data-watermark-enabled="{if $GZCA_WATERMARK.enabled}1{else}0{/if}">
         <input type="hidden" name="pwg_token" value="{$GZCA_TOKEN|escape:'html'}">
         <input type="hidden" name="gzca_action" value="upload_works">
+        <input type="hidden" name="watermark_upload_confirmed" value="0" data-watermark-upload-confirmed>
 
         <section class="gzca-panel gzca-upload-panel">
           <div class="gzca-panel-head"><div><p>第一步</p><h3>选择作品图片</h3></div><span class="gzca-help">自动分批上传</span></div>
@@ -195,7 +219,7 @@
             <small>请选择准确板块：父级板块会在前台“全部作品 / 直接上传”入口显示；子板块会在对应子板块页面显示。</small>
           </label>
           <div class="gzca-upload-selection" data-upload-selection hidden><span>本批作品将上传到</span><strong data-upload-path></strong></div>
-          <label class="gzca-field"><span>编号前缀</span><input type="text" name="code_prefix" placeholder="选择分类后自动填写" maxlength="48" data-code-prefix readonly><small>前缀跟随分类，系统自动生成连续编号，避免作品放错目录。</small></label>
+          <label class="gzca-field"><span>编号前缀</span><input type="text" name="code_prefix" placeholder="例如 YH-FJ" maxlength="48" data-code-prefix required autocomplete="off" spellcheck="false"><small>选择分类后会带入默认前缀，可按本批作品修改；系统将按该前缀生成连续编号。</small></label>
           <label class="gzca-field"><span>每批上传数量</span><select name="upload_batch_size" data-upload-batch-size><option value="20" selected>20 张（推荐）</option><option value="30">30 张</option><option value="40">40 张</option><option value="50">50 张（适合小图）</option></select><small>批次会依次处理；超过 72 MB 时系统自动拆小，避免服务器负载过高。</small></label>
           <input type="hidden" name="publish_now" value="0"><label class="gzca-check"><input type="checkbox" name="publish_now" value="1" checked><span><strong>上传后立即上架</strong><small>默认上传后前台可见；取消勾选时先保存为下架状态，检查后再发布。</small></span></label>
           <label class="gzca-check"><input type="checkbox" name="set_cover" value="1"><span><strong>把第一张设为分类封面</strong><small>显示在所选板块页面顶部；父级板块还会显示在分类入口卡片。</small></span></label>
@@ -306,7 +330,7 @@
             <label class="gzca-field"><span>分类名称</span><input type="text" name="name" value="{if $GZCA_EDIT_CATEGORY}{$GZCA_EDIT_CATEGORY.name|escape:'html'}{/if}" placeholder="例如 油画系列 / 风景画" required></label>
             {if !$GZCA_EDIT_CATEGORY}<label class="gzca-field"><span>上级板块</span><select name="parent_id" data-category-parent><option value="" data-kind="catalog">无，创建大板块</option>{foreach from=$GZCA_PARENT_CATEGORIES item=category}<option value="{$category.id}" data-kind="{$category.category_kind|escape:'html'}">{$category.name|escape:'html'}</option>{/foreach}</select><small>新增画展时请选择“中美协展览专项画稿”。</small></label>{/if}
             <label class="gzca-field"><span>板块类型</span><select name="category_kind" data-category-kind><option value="catalog" {if !$GZCA_EDIT_CATEGORY or $GZCA_EDIT_CATEGORY.category_kind neq 'exhibition'}selected{/if}>作品分类</option><option value="exhibition" {if $GZCA_EDIT_CATEGORY and $GZCA_EDIT_CATEGORY.category_kind eq 'exhibition'}selected{/if}>专项画展</option></select><small>用于后台分组和前台识别，不影响现有作品。</small></label>
-            <label class="gzca-field"><span>编号前缀</span><input type="text" name="code_prefix" value="{if $GZCA_EDIT_CATEGORY}{$GZCA_EDIT_CATEGORY.code_prefix|escape:'html'}{/if}" placeholder="例如 YH-FJ" required><small>上传作品时会用它自动生成连续编号。</small></label>
+            <label class="gzca-field"><span>编号前缀</span><input type="text" name="code_prefix" value="{if $GZCA_EDIT_CATEGORY}{$GZCA_EDIT_CATEGORY.code_prefix|escape:'html'}{/if}" placeholder="例如 YH-FJ" required><small>上传作品时会用它自动生成连续编号；普通保存只影响以后上传的作品，不会修改已有编号。</small></label>
             <label class="gzca-field"><span>分类说明</span><textarea name="description" rows="4" placeholder="简要说明这个分类展示什么内容">{if $GZCA_EDIT_CATEGORY}{$GZCA_EDIT_CATEGORY.description|escape:'html'}{/if}</textarea></label>
             {if $GZCA_EDIT_CATEGORY}<label class="gzca-field"><span>排序数字</span><input type="number" name="sort_order" value="{$GZCA_EDIT_CATEGORY.custom_sort_order}" min="0"><small>数字越小越靠前。</small></label>{/if}
             <label class="gzca-check"><input type="checkbox" name="visible" value="1" {if !$GZCA_EDIT_CATEGORY or $GZCA_EDIT_CATEGORY.visible eq 'true'}checked{/if}><span><strong>在前台显示这个分类</strong><small>取消后分类会暂时隐藏，但图片不会删除。</small></span></label>
@@ -315,6 +339,51 @@
             <button class="gzca-button gzca-button-primary gzca-button-block" type="submit">{if $GZCA_EDIT_CATEGORY}保存分类{else}创建分类{/if}</button>
           </form>
           {if $GZCA_EDIT_CATEGORY}
+            <div class="gzca-prefix-migration" data-prefix-migration data-preview-open="{if $GZCA_PREFIX_MIGRATION_PREVIEW}1{else}0{/if}">
+              <label class="gzca-check gzca-prefix-migration-toggle"><input type="checkbox" data-prefix-migration-toggle {if $GZCA_PREFIX_MIGRATION_PREVIEW}checked{/if}><span><strong>整体更改已有作品编号</strong><small>默认关闭。打开后必须先预览，再经过两次确认；当前不会自动修改任何编号。</small></span></label>
+              <div class="gzca-prefix-migration-body" data-prefix-migration-body {if !$GZCA_PREFIX_MIGRATION_PREVIEW}hidden{/if}>
+                <div class="gzca-prefix-current"><span>当前板块前缀</span><strong>{$GZCA_EDIT_CATEGORY.code_prefix|escape:'html'}</strong><small>范围仅包括直接归属于“{$GZCA_EDIT_CATEGORY.name|escape:'html'}”的作品，不包含子板块作品。</small></div>
+                <form class="gzca-stack-form gzca-prefix-preview-form" method="post" action="{$GZCA_URLS.categories|escape:'html'}&amp;edit={$GZCA_EDIT_CATEGORY.id}" data-prefix-preview-form>
+                  <input type="hidden" name="pwg_token" value="{$GZCA_TOKEN|escape:'html'}"><input type="hidden" name="gzca_action" value="preview_prefix_migration"><input type="hidden" name="category_id" value="{$GZCA_EDIT_CATEGORY.id}">
+                  <label class="gzca-field"><span>准备更换为</span><input type="text" name="new_prefix" value="{$GZCA_PREFIX_MIGRATION_INPUT|escape:'html'}" placeholder="例如 ZX-2026" maxlength="48" required data-prefix-migration-input autocomplete="off" spellcheck="false"><small>只替换前缀并保留原数字，例如 ZX-007 → ZX-2026-007；不会重新排序编号。</small></label>
+                  <button class="gzca-button gzca-button-quiet gzca-button-block" type="submit">预览编号变更</button>
+                </form>
+
+                {if $GZCA_PREFIX_MIGRATION_PREVIEW}
+                  <div class="gzca-prefix-preview" data-prefix-preview>
+                    <div class="gzca-prefix-preview-head"><div><span>只读预览</span><strong>{$GZCA_PREFIX_MIGRATION_PREVIEW.old_prefix|escape:'html'} → {$GZCA_PREFIX_MIGRATION_PREVIEW.new_prefix|escape:'html'}</strong></div><small>预览阶段没有写入数据库</small></div>
+                    <div class="gzca-prefix-summary">
+                      <div><span>直接归属作品</span><strong>{$GZCA_PREFIX_MIGRATION_PREVIEW.total_count}</strong></div>
+                      <div><span>准备修改</span><strong>{$GZCA_PREFIX_MIGRATION_PREVIEW.change_count}</strong></div>
+                      <div><span>保持不变</span><strong>{$GZCA_PREFIX_MIGRATION_PREVIEW.unchanged_count}</strong></div>
+                      <div class="{if $GZCA_PREFIX_MIGRATION_PREVIEW.issue_count}has-warning{/if}"><span>异常 / 冲突</span><strong>{$GZCA_PREFIX_MIGRATION_PREVIEW.issue_count}</strong></div>
+                    </div>
+                    {if $GZCA_PREFIX_MIGRATION_PREVIEW.notice}<div class="gzca-alert"><strong>预览提示</strong><span>{$GZCA_PREFIX_MIGRATION_PREVIEW.notice|escape:'html'}</span></div>{/if}
+
+                    {if $GZCA_PREFIX_MIGRATION_PREVIEW.changes_preview}
+                      <div class="gzca-table-wrap gzca-prefix-table"><table class="gzca-table"><thead><tr><th>作品</th><th>原编号</th><th>新编号</th></tr></thead><tbody>{foreach from=$GZCA_PREFIX_MIGRATION_PREVIEW.changes_preview item=change}<tr><td><strong>{$change.name|escape:'html'}</strong><small>#{$change.image_id}</small></td><td><code>{$change.old_code|escape:'html'}</code></td><td><code>{$change.new_code|escape:'html'}</code></td></tr>{/foreach}</tbody></table></div>
+                      {if $GZCA_PREFIX_MIGRATION_PREVIEW.change_count gt 50}<p class="gzca-help">这里只显示前 50 条，确认后会处理预览中的全部 {$GZCA_PREFIX_MIGRATION_PREVIEW.change_count} 条。</p>{/if}
+                    {/if}
+
+                    {if $GZCA_PREFIX_MIGRATION_PREVIEW.blocked_preview}
+                      <div class="gzca-alert gzca-alert-warn"><strong>以下作品需要先处理</strong><span>存在共享板块或编号格式异常，整体变更已被阻止。</span><ul>{foreach from=$GZCA_PREFIX_MIGRATION_PREVIEW.blocked_preview item=blocked}<li><code>{$blocked.old_code|escape:'html'}</code> · {$blocked.name|escape:'html'}：{$blocked.reason|escape:'html'}</li>{/foreach}</ul></div>
+                    {/if}
+                    {if $GZCA_PREFIX_MIGRATION_PREVIEW.conflicts_preview}
+                      <div class="gzca-alert gzca-alert-warn"><strong>目标编号发生冲突</strong><ul>{foreach from=$GZCA_PREFIX_MIGRATION_PREVIEW.conflicts_preview item=conflict}<li><code>{$conflict.new_code|escape:'html'}</code> 已被作品 #{$conflict.occupied_image_id} 使用。</li>{/foreach}</ul></div>
+                    {/if}
+
+                    {if $GZCA_PREFIX_MIGRATION_PREVIEW.can_execute}
+                      <form method="post" action="{$GZCA_URLS.categories|escape:'html'}&amp;edit={$GZCA_EDIT_CATEGORY.id}" data-prefix-migration-execute data-category-name="{$GZCA_EDIT_CATEGORY.name|escape:'html'}" data-old-prefix="{$GZCA_PREFIX_MIGRATION_PREVIEW.old_prefix|escape:'html'}" data-new-prefix="{$GZCA_PREFIX_MIGRATION_PREVIEW.new_prefix|escape:'html'}" data-change-count="{$GZCA_PREFIX_MIGRATION_PREVIEW.change_count}">
+                        <input type="hidden" name="pwg_token" value="{$GZCA_TOKEN|escape:'html'}"><input type="hidden" name="gzca_action" value="execute_prefix_migration"><input type="hidden" name="category_id" value="{$GZCA_EDIT_CATEGORY.id}"><input type="hidden" name="new_prefix" value="{$GZCA_PREFIX_MIGRATION_PREVIEW.new_prefix|escape:'html'}"><input type="hidden" name="migration_issued_at" value="{$GZCA_PREFIX_MIGRATION_PREVIEW.issued_at}"><input type="hidden" name="migration_signature" value="{$GZCA_PREFIX_MIGRATION_PREVIEW.signature|escape:'html'}"><input type="hidden" name="migration_confirmed" value="0" data-migration-confirmed><input type="hidden" name="migration_confirmed_again" value="0" data-migration-confirmed-again>
+                        <button class="gzca-button gzca-button-danger gzca-button-block" type="submit">整体更改 {$GZCA_PREFIX_MIGRATION_PREVIEW.change_count} 张作品编号</button>
+                      </form>
+                    {else}
+                      <button class="gzca-button gzca-button-block" type="button" disabled>解决异常后才能整体更改</button>
+                    {/if}
+                  </div>
+                {/if}
+              </div>
+            </div>
             <div class="gzca-danger-zone {if $GZCA_EDIT_CATEGORY.is_hidden}is-restore{/if}">
               <strong>{if $GZCA_EDIT_CATEGORY.is_hidden}显示板块{else}隐藏板块{/if}</strong>
               <p>{$GZCA_EDIT_CATEGORY.hide_note|escape:'html'}</p>

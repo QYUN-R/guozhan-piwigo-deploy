@@ -6,6 +6,14 @@
     return (bytes / 1024 / 1024).toFixed(1) + " MB";
   }
 
+  function normalizeCodePrefix(value) {
+    return String(value || "").trim().toUpperCase().replace(/[^A-Z0-9-]/g, "");
+  }
+
+  function validCodePrefix(value) {
+    return /^[A-Z0-9]{2,12}(?:-[A-Z0-9]{1,12})*$/.test(normalizeCodePrefix(value));
+  }
+
   function initMobileNavigation() {
     var sidebar = document.querySelector(".gzca-sidebar");
     var toggle = document.querySelector("[data-mobile-nav-toggle]");
@@ -113,6 +121,7 @@
     var progressBar = document.querySelector("[data-upload-progress-bar]");
     var progressLog = document.querySelector("[data-upload-progress-log]");
     var batchSizeControl = document.querySelector("[data-upload-batch-size]");
+    var watermarkUploadConfirmed = form ? form.querySelector("[data-watermark-upload-confirmed]") : null;
     var maxBatchBytes = 72 * 1024 * 1024;
 
     function addLog(text, type) {
@@ -158,17 +167,27 @@
     }
 
     if (category && prefix) {
+      var renderUploadSelection = function () {
+        var option = category.options[category.selectedIndex];
+        var currentPath = option ? option.getAttribute("data-path") : "";
+        if (selection && path) {
+          selection.hidden = !currentPath;
+          path.textContent = currentPath ? currentPath + "，本批编号前缀 " + (prefix.value || "未填写") : "";
+        }
+      };
       var syncCategory = function () {
         var option = category.options[category.selectedIndex];
         var nextPrefix = option ? option.getAttribute("data-prefix") : "";
-        var nextPath = option ? option.getAttribute("data-path") : "";
-        prefix.value = nextPrefix || "";
-        if (selection && path) {
-          selection.hidden = !nextPath;
-          path.textContent = nextPath ? nextPath + "，编号前缀 " + nextPrefix : "";
-        }
+        prefix.value = normalizeCodePrefix(nextPrefix);
+        prefix.setCustomValidity("");
+        renderUploadSelection();
       };
       category.addEventListener("change", syncCategory);
+      prefix.addEventListener("input", function () {
+        prefix.value = normalizeCodePrefix(prefix.value);
+        prefix.setCustomValidity("");
+        renderUploadSelection();
+      });
       syncCategory();
     }
 
@@ -180,6 +199,39 @@
 
         if (!category || !category.value) {
           showNotice("请选择上传板块", "先选择作品要归属的前台板块，再开始上传。");
+          return;
+        }
+
+        var codePrefix = prefix ? normalizeCodePrefix(prefix.value) : "";
+        if (!validCodePrefix(codePrefix)) {
+          if (prefix) {
+            prefix.value = codePrefix;
+            prefix.setCustomValidity("请输入有效编号前缀，例如 YH-FJ；只能使用英文字母、数字和连字符，每段不超过 12 位。");
+            prefix.reportValidity();
+            prefix.focus();
+          }
+          showNotice("编号前缀格式不正确", "请输入例如 YH-FJ 的前缀；只能使用英文字母、数字和连字符，每段不超过 12 位。");
+          return;
+        }
+        if (prefix) {
+          prefix.value = codePrefix;
+          prefix.setCustomValidity("");
+        }
+
+        if (form.getAttribute("data-watermark-enabled") !== "1" && (!watermarkUploadConfirmed || watermarkUploadConfirmed.value !== "1")) {
+          openConfirmation({ steps: [{
+            eyebrow: "无水印上传提醒",
+            title: "当前全站前台水印已关闭",
+            body: "继续后，这批作品上传到前台时不会带“图物计划国展素材”水印。",
+            detail: "建议取消上传并先开启水印。只有确认接受图片被直接保存或传播的风险时，才继续无水印上传。",
+            confirmLabel: "仍然无水印上传",
+            tone: "danger"
+          }] }).then(function (confirmed) {
+            if (!confirmed) return;
+            if (watermarkUploadConfirmed) watermarkUploadConfirmed.value = "1";
+            if (typeof form.requestSubmit === "function") form.requestSubmit();
+            else form.submit();
+          });
           return;
         }
 
@@ -213,7 +265,9 @@
             data.append("gzca_action", "upload_works");
             data.append("gzca_async", "1");
             data.append("album_id", category.value);
+            data.append("code_prefix", codePrefix);
             data.append("publish_now", publishNow && publishNow.checked ? "1" : "0");
+            if (watermarkUploadConfirmed) data.append("watermark_upload_confirmed", watermarkUploadConfirmed.value);
             if (setCover && setCover.checked && batchIndex === 0) data.append("set_cover", "1");
             batch.forEach(function (file) { data.append("artworks[]", file, file.name); });
 
@@ -250,9 +304,51 @@
             input.value = "";
             renderFiles(input, list);
           }
+          if (watermarkUploadConfirmed) watermarkUploadConfirmed.value = "0";
         })();
       });
     }
+  }
+
+  function initWatermarkControl() {
+    var panel = document.querySelector("[data-watermark-panel]");
+    var form = document.querySelector("[data-watermark-form]");
+    if (!panel || !form) return;
+
+    var toggle = form.querySelector("[data-watermark-toggle]");
+    var status = panel.querySelector("[data-watermark-status]");
+    var summary = panel.querySelector("[data-watermark-summary]");
+    var save = form.querySelector("[data-watermark-save]");
+    var confirmed = form.querySelector("[data-watermark-disable-confirmed]");
+    var confirmedAgain = form.querySelector("[data-watermark-disable-confirmed-again]");
+    var currentEnabled = form.getAttribute("data-watermark-current") === "1";
+
+    function render() {
+      if (!toggle) return;
+      var desiredEnabled = toggle.checked;
+      var changed = desiredEnabled !== currentEnabled;
+      panel.classList.toggle("is-disabled", !desiredEnabled);
+      panel.classList.toggle("is-pending", changed);
+      if (status) {
+        status.textContent = changed ? (desiredEnabled ? "准备开启" : "准备关闭") : (desiredEnabled ? "已开启" : "已关闭");
+        status.classList.toggle("is-online", desiredEnabled);
+        status.classList.toggle("is-offline", !desiredEnabled);
+      }
+      if (summary) {
+        summary.textContent = desiredEnabled
+          ? "保存后，前台所有现有和后续作品图片都会使用透明水印版本，原图仅在后台保留。"
+          : "关闭会影响全站现有和后续作品；保存时必须连续完成两次确认。";
+      }
+      if (save) {
+        save.textContent = changed ? "保存水印设置" : "水印设置已保存";
+        if (!toggle.disabled) save.disabled = !changed;
+      }
+      if (confirmed) confirmed.value = "0";
+      if (confirmedAgain) confirmedAgain.value = "0";
+    }
+
+    if (toggle) toggle.addEventListener("change", render);
+    render();
   }
 
   var confirmationLayer = null;
@@ -394,11 +490,42 @@
         var button = form.querySelector("button[type='submit']");
         var options = null;
         var confirmValue = "";
+        var afterConfirm = null;
 
         if (action.value === "download_work") return;
 
         if (form.getAttribute("data-confirmed-submit") === "1") {
           form.removeAttribute("data-confirmed-submit");
+        }
+        else if (action.value === "set_watermark") {
+          var watermarkToggle = form.querySelector("[data-watermark-toggle]");
+          var enablingWatermark = Boolean(watermarkToggle && watermarkToggle.checked);
+          if (!enablingWatermark) {
+            options = { steps: [
+              {
+                eyebrow: "关闭水印",
+                title: "关闭全站前台水印？",
+                body: "关闭后，现有作品和以后上传的作品在前台都将不再显示水印。",
+                detail: "访客可以直接保存未加水印的前台图片。原图和数据库不会删除，但图片保护会立即失效。",
+                confirmLabel: "继续核对",
+                tone: "danger"
+              },
+              {
+                eyebrow: "第二次确认",
+                title: "确认承担无水印展示风险",
+                body: "请再次确认确实需要关闭。之后每次无水印上传，系统仍会单独提醒。",
+                detail: "如无明确业务原因，建议取消并保持水印开启。",
+                confirmLabel: "确认关闭水印",
+                tone: "danger"
+              }
+            ] };
+            afterConfirm = function () {
+              var first = form.querySelector("[data-watermark-disable-confirmed]");
+              var second = form.querySelector("[data-watermark-disable-confirmed-again]");
+              if (first) first.value = "1";
+              if (second) second.value = "1";
+            };
+          }
         }
         else if (action.value === "toggle_work") {
           var label = button ? button.textContent.trim() : "修改状态";
@@ -422,6 +549,36 @@
             confirmLabel: "确认下架封面",
             tone: "normal"
           }] };
+        }
+        else if (action.value === "execute_prefix_migration") {
+          var migrationName = form.getAttribute("data-category-name") || "这个板块";
+          var oldPrefix = form.getAttribute("data-old-prefix") || "旧前缀";
+          var newPrefix = form.getAttribute("data-new-prefix") || "新前缀";
+          var migrationCount = form.getAttribute("data-change-count") || "全部";
+          options = { steps: [
+            {
+              eyebrow: "整体更改编号",
+              title: "把「" + migrationName + "」的 " + migrationCount + " 张作品改为 " + newPrefix + "？",
+              body: "系统只替换编号前缀并保留原数字，例如 " + oldPrefix + "-007 → " + newPrefix + "-007。",
+              detail: "旧编号将不再用于前台搜索和客服查询；图片文件、分类关系和上下架状态不会改变。",
+              confirmLabel: "继续核对",
+              tone: "danger"
+            },
+            {
+              eyebrow: "第二次确认",
+              title: "确认执行整体编号变更",
+              body: "服务器会在提交时重新检查全部编号和冲突，任何异常都会停止执行。",
+              detail: "请确认已经核对预览列表、新前缀和作品数量。本操作不会在当前开关打开时自动执行，只有本次确认后才会写入。",
+              confirmLabel: "确认更改 " + migrationCount + " 张编号",
+              tone: "danger"
+            }
+          ] };
+          afterConfirm = function () {
+            var firstMigrationConfirm = form.querySelector("[data-migration-confirmed]");
+            var secondMigrationConfirm = form.querySelector("[data-migration-confirmed-again]");
+            if (firstMigrationConfirm) firstMigrationConfirm.value = "1";
+            if (secondMigrationConfirm) secondMigrationConfirm.value = "1";
+          };
         }
         else if (action.value === "hide_category" || action.value === "show_category") {
           var categoryName = form.getAttribute("data-category-name") || "这个板块";
@@ -483,7 +640,9 @@
         if (options) {
           event.preventDefault();
           openConfirmation(options).then(function (confirmed) {
-            if (confirmed) submitAfterConfirmation(form, button, confirmValue);
+            if (!confirmed) return;
+            if (afterConfirm) afterConfirm();
+            submitAfterConfirmation(form, button, confirmValue);
           });
           return;
         }
@@ -491,7 +650,13 @@
         if (!event.defaultPrevented && button) {
           button.disabled = true;
           button.dataset.originalText = button.textContent;
-          button.textContent = action.value === "upload_works" ? "正在上传…" : ((action.value === "delete_category" || action.value === "delete_work") ? "正在删除…" : "正在保存…");
+          button.textContent = action.value === "upload_works"
+            ? "正在上传…"
+            : (action.value === "set_watermark"
+              ? "正在更新图片…"
+              : (action.value === "execute_prefix_migration"
+                ? "正在更改编号…"
+                : ((action.value === "delete_category" || action.value === "delete_work") ? "正在删除…" : "正在保存…")));
         }
       });
     });
@@ -525,6 +690,26 @@
         prefix.value = prefix.value.toUpperCase().replace(/[^A-Z0-9-]/g, "");
       });
     }
+  }
+
+  function initPrefixMigration() {
+    var wrapper = document.querySelector("[data-prefix-migration]");
+    if (!wrapper) return;
+    var toggle = wrapper.querySelector("[data-prefix-migration-toggle]");
+    var body = wrapper.querySelector("[data-prefix-migration-body]");
+    var input = wrapper.querySelector("[data-prefix-migration-input]");
+
+    var update = function () {
+      if (body) body.hidden = !(toggle && toggle.checked);
+    };
+    if (wrapper.getAttribute("data-preview-open") === "1" && toggle) toggle.checked = true;
+    if (toggle) toggle.addEventListener("change", update);
+    if (input) {
+      input.addEventListener("input", function () {
+        input.value = input.value.toUpperCase().replace(/[^A-Z0-9-]/g, "");
+      });
+    }
+    update();
   }
 
   function initCategoryBrowser() {
@@ -723,10 +908,12 @@
   document.addEventListener("DOMContentLoaded", function () {
     initMobileNavigation();
     initUpload();
+    initWatermarkControl();
     initBulkWorks();
     initConfirmations();
     initCompetitionForm();
     initCategoryForm();
+    initPrefixMigration();
     initCategoryBrowser();
     initWorkFilters();
   });

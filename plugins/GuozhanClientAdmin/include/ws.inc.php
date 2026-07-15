@@ -232,26 +232,20 @@ SELECT
     if ($include_detail)
     {
       $detail_derivatives = array();
-      $allowed_detail_derivatives = array('xsmall', 'small', 'medium', 'large', 'xlarge');
-      foreach ($allowed_detail_derivatives as $derivative_name)
+      if (isset($standard_urls['derivatives']['xsmall']))
       {
-        if (isset($standard_urls['derivatives'][$derivative_name]))
+        $safe_xsmall_url = gzca_image_derivative_url($row, IMG_XSMALL);
+        if ('' !== $safe_xsmall_url)
         {
-          $detail_derivatives[$derivative_name] = $standard_urls['derivatives'][$derivative_name];
+          $detail_derivatives['xsmall'] = $standard_urls['derivatives']['xsmall'];
+          $detail_derivatives['xsmall']['url'] = $safe_xsmall_url;
         }
       }
 
       $display_url = gzca_image_derivative_url($row, IMG_XLARGE);
       if ('' === $display_url)
       {
-        foreach (array('xlarge', 'large', 'medium') as $fallback_type)
-        {
-          if (!empty($detail_derivatives[$fallback_type]['url']))
-          {
-            $display_url = $detail_derivatives[$fallback_type]['url'];
-            break;
-          }
-        }
+        $display_url = gzca_image_derivative_url($row, IMG_XSMALL);
       }
       $safe_urls = array(
         'page_url' => gzca_frontend_url('detail', array('image_id' => (int)$row['id'], 'code' => $code)),
@@ -263,12 +257,21 @@ SELECT
     else
     {
       $thumbnail_derivatives = array();
-      $allowed_thumbnail_derivatives = array('xsmall', 'thumb', 'square');
-      foreach ($allowed_thumbnail_derivatives as $derivative_name)
+      $allowed_thumbnail_derivatives = array(
+        'xsmall' => IMG_XSMALL,
+        'thumb' => IMG_THUMB,
+        'square' => IMG_SQUARE,
+        );
+      foreach ($allowed_thumbnail_derivatives as $derivative_name => $derivative_type)
       {
         if (isset($standard_urls['derivatives'][$derivative_name]))
         {
-          $thumbnail_derivatives[$derivative_name] = $standard_urls['derivatives'][$derivative_name];
+          $safe_derivative_url = gzca_image_derivative_url($row, $derivative_type);
+          if ('' !== $safe_derivative_url)
+          {
+            $thumbnail_derivatives[$derivative_name] = $standard_urls['derivatives'][$derivative_name];
+            $thumbnail_derivatives[$derivative_name]['url'] = $safe_derivative_url;
+          }
         }
       }
 

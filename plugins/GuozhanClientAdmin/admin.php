@@ -23,6 +23,8 @@ if (!empty($action))
 $email_security = gzca_admin_email_security_status((int)$user['id']);
 $mail_status = gzca_security_mail_status();
 $security_form_email = isset($_POST['new_email']) ? gzca_normalize_email($_POST['new_email']) : '';
+$prefix_migration_preview = null;
+$prefix_migration_input = isset($_POST['new_prefix']) ? gzca_normalize_code($_POST['new_prefix']) : '';
 
 if ('revoke_other_sessions' === $action)
 {
@@ -219,16 +221,61 @@ if ('import_sample_works' === $action)
   }
 }
 
+if ('set_watermark' === $action)
+{
+  $watermark_enabled = isset($_POST['watermark_enabled']) && '1' === (string)$_POST['watermark_enabled'];
+  $disable_confirmed = isset($_POST['watermark_disable_confirmed']) && '1' === (string)$_POST['watermark_disable_confirmed'];
+  $disable_confirmed_again = isset($_POST['watermark_disable_confirmed_again']) && '1' === (string)$_POST['watermark_disable_confirmed_again'];
+  $watermark_error = '';
+  $watermark_changed = false;
+
+  if (!$watermark_enabled && (!$disable_confirmed || !$disable_confirmed_again))
+  {
+    $page['errors'][] = '关闭全站前台水印必须完成两次确认，本次设置未改变。';
+  }
+  elseif (gzca_set_frontend_watermark($watermark_enabled, $watermark_error, $watermark_changed))
+  {
+    if ($watermark_enabled)
+    {
+      $page['infos'][] = $watermark_changed
+        ? '前台水印已开启，现有作品图片已安全重建，后续作品也会使用水印版本。'
+        : '前台水印已经开启，设置无需变更。';
+    }
+    else
+    {
+      $page['infos'][] = $watermark_changed
+        ? '前台水印已关闭，现有作品图片已安全重建。下次上传前系统仍会提醒无水印风险。'
+        : '前台水印已处于关闭状态。';
+    }
+  }
+  else
+  {
+    $page['errors'][] = $watermark_error ?: '前台水印设置失败，设置未改变。';
+  }
+}
+
 if ('upload_works' === $action)
 {
   $album_id = isset($_POST['album_id']) ? (int)$_POST['album_id'] : 0;
+  $code_prefix = isset($_POST['code_prefix']) && is_scalar($_POST['code_prefix'])
+    ? gzca_normalize_code($_POST['code_prefix'])
+    : '';
   $publish_now = isset($_POST['publish_now']) && '1' === (string)$_POST['publish_now'];
   $set_cover = isset($_POST['set_cover']);
+  $watermark_upload_confirmed = isset($_POST['watermark_upload_confirmed']) && '1' === (string)$_POST['watermark_upload_confirmed'];
   $uploads = gzca_normalize_uploads(isset($_FILES['artworks']) ? $_FILES['artworks'] : array());
   $async_upload = isset($_POST['gzca_async']) && '1' === (string)$_POST['gzca_async'];
 
   $upload_errors = array();
-  $upload_result = gzca_upload_works_batch($album_id, $uploads, $publish_now, $set_cover, $upload_errors);
+  $upload_result = gzca_upload_works_batch(
+    $album_id,
+    $uploads,
+    $publish_now,
+    $set_cover,
+    $upload_errors,
+    $code_prefix,
+    $watermark_upload_confirmed
+    );
 
   if ($async_upload)
   {
@@ -247,6 +294,7 @@ if ('upload_works' === $action)
       'message' => $upload_result['message'],
       'compressed_count' => $upload_result['compressed_count'],
       'compressed_saved' => gzca_format_bytes($upload_result['compressed_saved_bytes']),
+      'watermark_enabled' => $upload_result['watermark_enabled'],
       'errors' => $upload_errors,
       ), JSON_UNESCAPED_UNICODE);
     exit;
@@ -524,6 +572,71 @@ if ('delete_category' === $action)
     else
     {
       $page['errors'][] = $category_error ?: '永久删除板块失败。';
+    }
+  }
+}
+
+if ('preview_prefix_migration' === $action)
+{
+  $category_id = isset($_POST['category_id']) ? (int)$_POST['category_id'] : 0;
+  $migration_error = '';
+  $prefix_migration_preview = gzca_prefix_migration_plan($category_id, $prefix_migration_input, $migration_error);
+  if (false === $prefix_migration_preview)
+  {
+    $page['errors'][] = $migration_error;
+  }
+  else
+  {
+    $issued_at = time();
+    $prefix_migration_preview['issued_at'] = $issued_at;
+    $prefix_migration_preview['signature'] = gzca_prefix_migration_signature($prefix_migration_preview, (int)$user['id'], $issued_at);
+  }
+}
+
+if ('execute_prefix_migration' === $action)
+{
+  $category_id = isset($_POST['category_id']) ? (int)$_POST['category_id'] : 0;
+  $issued_at = isset($_POST['migration_issued_at']) ? (int)$_POST['migration_issued_at'] : 0;
+  $submitted_signature = isset($_POST['migration_signature']) ? trim((string)$_POST['migration_signature']) : '';
+  $confirmed = isset($_POST['migration_confirmed']) && '1' === (string)$_POST['migration_confirmed'];
+  $confirmed_again = isset($_POST['migration_confirmed_again']) && '1' === (string)$_POST['migration_confirmed_again'];
+  $migration_error = '';
+  $plan = gzca_prefix_migration_plan($category_id, $prefix_migration_input, $migration_error);
+
+  if (!$confirmed || !$confirmed_again)
+  {
+    $page['errors'][] = '整体更改编号必须经过两次确认，本次没有执行。';
+  }
+  elseif ($issued_at < time() - 900 || $issued_at > time() + 60)
+  {
+    $page['errors'][] = '编号变更预览已超过 15 分钟，请重新生成预览。';
+  }
+  elseif (false === $plan)
+  {
+    $page['errors'][] = $migration_error;
+  }
+  else
+  {
+    $expected_signature = gzca_prefix_migration_signature($plan, (int)$user['id'], $issued_at);
+    if ('' === $submitted_signature || !hash_equals($expected_signature, $submitted_signature))
+    {
+      $page['errors'][] = '作品或编号在预览后发生了变化，请重新预览，未修改任何编号。';
+      $prefix_migration_preview = $plan;
+      $prefix_migration_preview['issued_at'] = time();
+      $prefix_migration_preview['signature'] = gzca_prefix_migration_signature($prefix_migration_preview, (int)$user['id'], $prefix_migration_preview['issued_at']);
+    }
+    else
+    {
+      $changed = gzca_execute_prefix_migration_plan($plan, $migration_error);
+      if (false === $changed)
+      {
+        $page['errors'][] = $migration_error;
+      }
+      else
+      {
+        $page['infos'][] = '已将板块“'.$plan['category_name'].'”的前缀从 '.$plan['old_prefix'].' 更改为 '.$plan['new_prefix'].'，并同步更新 '.$changed.' 张已有作品编号。';
+        $prefix_migration_input = '';
+      }
     }
   }
 }
@@ -999,6 +1112,7 @@ $template->assign(array(
   'GZCA_CATEGORY_OPTIONS' => $category_options,
   'GZCA_CATEGORY_OPTION_GROUPS' => $category_option_groups,
   'GZCA_UPLOAD_TARGET_COUNT' => $upload_target_count,
+  'GZCA_WATERMARK' => gzca_frontend_watermark_state(),
   'GZCA_PARENT_CATEGORIES' => $parent_categories,
   'GZCA_CATEGORY_GROUPS' => $category_groups,
   'GZCA_WORKS' => $works,
@@ -1006,6 +1120,8 @@ $template->assign(array(
   'GZCA_FILTERS' => $filters,
   'GZCA_EDIT_WORK' => $edit_work,
   'GZCA_EDIT_CATEGORY' => $edit_category,
+  'GZCA_PREFIX_MIGRATION_PREVIEW' => $prefix_migration_preview,
+  'GZCA_PREFIX_MIGRATION_INPUT' => $prefix_migration_input,
   'GZCA_CONFIG' => gzca_config(),
   'GZCA_HERO_SLIDES' => gzca_admin_hero_slides(),
   'GZCA_CONTACTS' => gzca_normalize_contacts(),

@@ -20,6 +20,7 @@ function gzca_default_config()
     'admin_login_whitelist_enabled' => true,
     'admin_login_whitelist' => array('admin'),
     'frontend_sync' => true,
+    'watermark_enabled' => true,
     'hero_slides' => gzca_default_hero_slides(),
     );
 }
@@ -58,6 +59,326 @@ function gzca_config()
   }
 
   return $conf['gzca_config'];
+}
+
+function gzca_watermark_relative_path()
+{
+  $absolute_path = str_replace('\\', '/', GZCA_PATH.'assets/guozhan-material-watermark.png');
+  $root_path = rtrim(str_replace('\\', '/', PHPWG_ROOT_PATH), '/').'/';
+
+  if (0 === strpos($absolute_path, $root_path))
+  {
+    return substr($absolute_path, strlen($root_path));
+  }
+
+  return ltrim($absolute_path, './');
+}
+
+function gzca_frontend_watermark_types()
+{
+  return array(
+    IMG_SQUARE,
+    IMG_THUMB,
+    IMG_XXSMALL,
+    IMG_XSMALL,
+    IMG_SMALL,
+    IMG_MEDIUM,
+    IMG_LARGE,
+    IMG_XLARGE,
+    IMG_XXLARGE,
+    );
+}
+
+function gzca_frontend_watermark_state()
+{
+  $config = gzca_config();
+  $relative_path = gzca_watermark_relative_path();
+  $absolute_path = PHPWG_ROOT_PATH.$relative_path;
+  $asset_ready = is_file($absolute_path);
+  $watermark = class_exists('ImageStdParams') ? ImageStdParams::get_watermark() : null;
+  $configured_file = is_object($watermark) ? trim((string)$watermark->file) : '';
+  $normalized_file = ltrim(str_replace('\\', '/', $configured_file), './');
+  $normalized_expected = ltrim(str_replace('\\', '/', $relative_path), './');
+  $managed = '' !== $normalized_file && $normalized_file === $normalized_expected;
+  $type_map = class_exists('ImageStdParams') ? ImageStdParams::get_defined_type_map() : array();
+  $watermarked_types = array();
+  $required_types = array();
+
+  foreach (gzca_frontend_watermark_types() as $type)
+  {
+    if (!isset($type_map[$type]))
+    {
+      continue;
+    }
+    $required_types[] = $type;
+    if (!empty($type_map[$type]->use_watermark))
+    {
+      $watermarked_types[] = $type;
+    }
+  }
+
+  $enabled = $asset_ready
+    && $managed
+    && !empty($required_types)
+    && count($watermarked_types) === count($required_types);
+
+  return array(
+    'enabled' => $enabled,
+    'requested_enabled' => !empty($config['watermark_enabled']),
+    'configured' => '' !== $configured_file,
+    'managed' => $managed,
+    'file' => $configured_file,
+    'asset_ready' => $asset_ready,
+    'preview_url' => $asset_ready
+      ? get_root_url().$relative_path.'?v='.(int)filemtime($absolute_path)
+      : '',
+    'text' => '图物计划国展素材',
+    'required_types' => $required_types,
+    'watermarked_types' => $watermarked_types,
+    );
+}
+
+function gzca_derivative_cache_path()
+{
+  $relative_path = defined('PWG_DERIVATIVE_DIR') ? PWG_DERIVATIVE_DIR : '_data/i/';
+  return rtrim(PHPWG_ROOT_PATH.$relative_path, '/\\');
+}
+
+function gzca_validate_derivative_cache_writable(&$error='')
+{
+  $error = '';
+  $cache_path = gzca_derivative_cache_path();
+  $parent_path = dirname($cache_path);
+
+  if (!is_dir($parent_path) || !is_writable($parent_path))
+  {
+    $error = '图片缓存上级目录不可写，已阻止切换水印，前台保持原状态。';
+    return false;
+  }
+
+  if (!file_exists($cache_path))
+  {
+    return true;
+  }
+
+  if (!is_dir($cache_path) || !is_writable($cache_path))
+  {
+    $error = '图片缓存目录权限异常，已阻止切换水印，前台保持原状态。';
+    return false;
+  }
+
+  try
+  {
+    $iterator = new RecursiveIteratorIterator(
+      new RecursiveDirectoryIterator($cache_path, FilesystemIterator::SKIP_DOTS),
+      RecursiveIteratorIterator::SELF_FIRST
+      );
+    foreach ($iterator as $item)
+    {
+      if ($item->isDir() && !$item->isWritable())
+      {
+        $error = '图片缓存子目录权限异常，已阻止切换水印，前台保持原状态。';
+        return false;
+      }
+    }
+  }
+  catch (Throwable $exception)
+  {
+    $error = '图片缓存目录无法完整检查，已阻止切换水印，前台保持原状态。';
+    return false;
+  }
+
+  return true;
+}
+
+function gzca_set_frontend_watermark($enabled, &$error='', &$changed=false)
+{
+  global $conf;
+
+  $error = '';
+  $changed = false;
+  $enabled = !empty($enabled);
+
+  if (!class_exists('ImageStdParams') || !class_exists('WatermarkParams'))
+  {
+    $error = 'Piwigo 图片衍生图组件尚未加载，水印设置未改变。';
+    return false;
+  }
+
+  $relative_path = gzca_watermark_relative_path();
+  if ($enabled && !is_file(PHPWG_ROOT_PATH.$relative_path))
+  {
+    $error = '水印图片文件不存在，已阻止开启或上传无水印图片。';
+    return false;
+  }
+
+  if (!gzca_validate_derivative_cache_writable($error))
+  {
+    return false;
+  }
+
+  $lock_path = dirname(gzca_derivative_cache_path()).'/.gzca-watermark-toggle.lock';
+  $lock_handle = @fopen($lock_path, 'c');
+  if (false === $lock_handle || !@flock($lock_handle, LOCK_EX | LOCK_NB))
+  {
+    $error = '另一项水印更新仍在进行，请稍后再试。';
+    return false;
+  }
+
+  $old = ImageStdParams::get_watermark();
+  if (!is_object($old))
+  {
+    $old = new WatermarkParams();
+  }
+  $old_watermark = unserialize(serialize($old));
+  $old_type_map = unserialize(serialize(ImageStdParams::get_defined_type_map()));
+
+  $watermark = new WatermarkParams();
+  $watermark->file = $enabled ? $relative_path : '';
+  $watermark->min_size = array(1, 1);
+  $watermark->xpos = 50;
+  $watermark->ypos = 50;
+  $watermark->xrepeat = 0;
+  $watermark->yrepeat = 0;
+  $watermark->opacity = 100;
+
+  $old_signature = array(
+    (string)$old->file,
+    array_map('intval', (array)$old->min_size),
+    (int)$old->xpos,
+    (int)$old->ypos,
+    (int)$old->xrepeat,
+    (int)$old->yrepeat,
+    (int)$old->opacity,
+    );
+  $new_signature = array(
+    (string)$watermark->file,
+    $watermark->min_size,
+    $watermark->xpos,
+    $watermark->ypos,
+    $watermark->xrepeat,
+    $watermark->yrepeat,
+    $watermark->opacity,
+    );
+  $watermark_changed = $old_signature !== $new_signature;
+
+  ImageStdParams::set_watermark($watermark);
+  $changed_types = array();
+  $changed_at = time();
+  foreach (ImageStdParams::get_defined_type_map() as $type => $params)
+  {
+    $old_use_watermark = !empty($params->use_watermark);
+    ImageStdParams::apply_global($params);
+    $type_changed = $old_use_watermark !== !empty($params->use_watermark);
+    if (!$type_changed && !empty($params->use_watermark) && $watermark_changed)
+    {
+      $type_changed = true;
+    }
+    if ($type_changed)
+    {
+      $params->last_mod_time = $changed_at;
+      $changed_types[] = $type;
+    }
+  }
+
+  if ($watermark_changed || !empty($changed_types))
+  {
+    ignore_user_abort(true);
+    @set_time_limit(0);
+
+    $cache_path = gzca_derivative_cache_path();
+    $cache_parent = dirname($cache_path);
+    $cache_mode = is_dir($cache_path) ? (fileperms($cache_path) & 0777) : 0755;
+    $cache_backup = $cache_parent.'/i.gzca-toggle-'.gmdate('YmdHis').'-'.substr(sha1(uniqid('', true)), 0, 10);
+    $cache_moved = false;
+
+    if (is_dir($cache_path))
+    {
+      if (!@rename($cache_path, $cache_backup))
+      {
+        ImageStdParams::set_watermark($old_watermark);
+        ImageStdParams::set_and_save($old_type_map);
+        $error = '图片缓存无法进入安全更新状态，已阻止切换水印，前台保持原状态。';
+        return false;
+      }
+      $cache_moved = true;
+    }
+
+    if (!@mkdir($cache_path, $cache_mode, true) && !is_dir($cache_path))
+    {
+      if ($cache_moved)
+      {
+        @rename($cache_backup, $cache_path);
+      }
+      ImageStdParams::set_watermark($old_watermark);
+      ImageStdParams::set_and_save($old_type_map);
+      $error = '无法创建新的图片缓存目录，水印设置未改变。';
+      return false;
+    }
+
+    ImageStdParams::save();
+    $prewarm_error = '';
+    $prewarm_summary = array();
+    try
+    {
+      $prewarm_ok = gzca_prewarm_all_frontend_derivatives($prewarm_error, $prewarm_summary);
+    }
+    catch (Throwable $exception)
+    {
+      $prewarm_ok = false;
+      $prewarm_error = '前台图片生成过程异常。';
+    }
+    if (!$prewarm_ok)
+    {
+      ImageStdParams::set_watermark($old_watermark);
+      ImageStdParams::set_and_save($old_type_map);
+
+      if (!function_exists('deltree'))
+      {
+        include_once(PHPWG_ROOT_PATH.'admin/include/functions.php');
+      }
+      if (function_exists('deltree'))
+      {
+        deltree($cache_path);
+      }
+      if (is_dir($cache_path))
+      {
+        $error = '前台图片生成失败，且新缓存无法清理。请勿继续切换水印并联系技术人员。';
+        return false;
+      }
+      if ($cache_moved && !@rename($cache_backup, $cache_path))
+      {
+        $error = '前台图片生成失败，旧缓存自动恢复失败。请勿继续操作并联系技术人员。';
+        return false;
+      }
+
+      $error = ($prewarm_error ?: '前台图片生成未完成').' 水印设置已自动恢复，前台保持原状态。';
+      return false;
+    }
+
+    if ($cache_moved)
+    {
+      if (!function_exists('deltree'))
+      {
+        include_once(PHPWG_ROOT_PATH.'admin/include/functions.php');
+      }
+      if (function_exists('deltree'))
+      {
+        deltree($cache_backup);
+      }
+    }
+    $changed = true;
+  }
+
+  $config = gzca_config();
+  if (!isset($config['watermark_enabled']) || (bool)$config['watermark_enabled'] !== $enabled)
+  {
+    $config['watermark_enabled'] = $enabled;
+    conf_update_param('gzca_config', $config, true, 'serialize');
+    $conf['gzca_config'] = $config;
+  }
+
+  return true;
 }
 
 function gzca_admin_url($tab='dashboard', $params=array())
@@ -1220,6 +1541,246 @@ function gzca_category_prefix_exists($prefix, $exclude_category_id=0)
   return (int)$count > 0;
 }
 
+function gzca_replace_embedded_code($comment, $code)
+{
+  $comment = preg_replace('/<!--\s*GZCA_CODE:.*?-->/is', '', (string)$comment);
+  return '<!--GZCA_CODE:'.gzca_normalize_code($code).'-->'.trim($comment);
+}
+
+function gzca_prefix_migration_plan($category_id, $new_prefix, &$error)
+{
+  $error = '';
+  $category_id = (int)$category_id;
+  $new_prefix = gzca_normalize_code($new_prefix);
+  if (!gzca_category_exists($category_id))
+  {
+    $error = '板块不存在或已经被删除。';
+    return false;
+  }
+  if (!gzca_valid_prefix($new_prefix))
+  {
+    $error = '新编号前缀格式不正确，例如 YH-FJ。';
+    return false;
+  }
+  if (gzca_category_prefix_exists($new_prefix, $category_id))
+  {
+    $error = '新编号前缀“'.$new_prefix.'”已经被其他板块使用。';
+    return false;
+  }
+
+  $old_prefix = gzca_category_prefix($category_id);
+  $category_name = gzca_category_path($category_id);
+  $rows = query2array('
+SELECT
+    i.id,
+    i.name,
+    i.comment,
+    i.level,
+    gw.code AS gzca_code,
+    gw.status AS gzca_status,
+    gw.featured,
+    gw.sort_order,
+    gw.download_count,
+    (SELECT COUNT(*) FROM '.IMAGE_CATEGORY_TABLE.' AS shared_ic WHERE shared_ic.image_id = i.id) AS category_count
+  FROM '.IMAGES_TABLE.' AS i
+    INNER JOIN '.IMAGE_CATEGORY_TABLE.' AS ic ON ic.image_id = i.id AND ic.category_id = '.$category_id.'
+    LEFT JOIN '.GZCA_WORKS_TABLE.' AS gw ON gw.image_id = i.id
+  ORDER BY COALESCE(gw.code, \'\'), i.id
+;');
+
+  $changes = array();
+  $unchanged = array();
+  $blocked = array();
+  $same_prefix = $old_prefix === $new_prefix;
+  foreach ($rows as $row)
+  {
+    $meta = gzca_work_meta($row);
+    $old_code = gzca_normalize_code($meta['code']);
+    $item = array(
+      'image_id' => (int)$row['id'],
+      'name' => '' !== trim((string)$row['name']) ? $row['name'] : '未命名作品 #'.(int)$row['id'],
+      'old_code' => $old_code,
+      'comment' => isset($row['comment']) ? (string)$row['comment'] : '',
+      'status' => $meta['status'],
+      'featured' => !empty($meta['featured']) ? 1 : 0,
+      'sort_order' => (int)$meta['sort_order'],
+      'download_count' => (int)$meta['download_count'],
+      'category_count' => (int)$row['category_count'],
+      );
+
+    if ((int)$item['category_count'] > 1)
+    {
+      $item['reason'] = '这张作品同时属于多个板块，请先在作品编辑页整理为单一所属板块。';
+      $blocked[] = $item;
+      continue;
+    }
+    if ($same_prefix)
+    {
+      $item['new_code'] = $old_code;
+      $unchanged[] = $item;
+      continue;
+    }
+    if (preg_match('/^'.preg_quote($old_prefix, '/').'-(\d{3,6})$/', $old_code, $matches))
+    {
+      $item['new_code'] = $new_prefix.'-'.$matches[1];
+      if (!gzca_valid_code($item['new_code']))
+      {
+        $item['reason'] = '生成的新编号格式无效。';
+        $blocked[] = $item;
+      }
+      else
+      {
+        $changes[] = $item;
+      }
+      continue;
+    }
+    if (preg_match('/^'.preg_quote($new_prefix, '/').'-(\d{3,6})$/', $old_code))
+    {
+      $item['new_code'] = $old_code;
+      $unchanged[] = $item;
+      continue;
+    }
+    $item['reason'] = '当前编号不符合旧前缀“'.$old_prefix.'-数字”，系统不会猜测或自动重排。';
+    $blocked[] = $item;
+  }
+
+  $target_sources = array();
+  foreach ($changes as $change)
+  {
+    $target_sources[$change['new_code']] = (int)$change['image_id'];
+  }
+  $conflicts = array();
+  if (!empty($target_sources))
+  {
+    $escaped_targets = array_map(function ($code) {
+      return "'".pwg_db_real_escape_string($code)."'";
+    }, array_keys($target_sources));
+    $conflict_rows = query2array(
+      'SELECT image_id, code FROM '.GZCA_WORKS_TABLE.' WHERE code IN ('.implode(',', $escaped_targets).');'
+      );
+    foreach ($conflict_rows as $conflict_row)
+    {
+      $code = gzca_normalize_code($conflict_row['code']);
+      if (isset($target_sources[$code]) && (int)$conflict_row['image_id'] !== (int)$target_sources[$code])
+      {
+        $conflicts[] = array(
+          'image_id' => (int)$target_sources[$code],
+          'new_code' => $code,
+          'occupied_image_id' => (int)$conflict_row['image_id'],
+          'reason' => '目标编号已被其他作品占用。',
+          );
+      }
+    }
+  }
+
+  $notice = '';
+  if ($same_prefix)
+  {
+    $notice = '新前缀与当前前缀相同，没有需要迁移的编号。';
+  }
+  elseif (empty($rows))
+  {
+    $notice = '这个板块当前没有直接归属的作品，只需使用普通“保存分类”修改前缀。';
+  }
+  elseif (empty($changes) && empty($blocked) && empty($conflicts))
+  {
+    $notice = '没有找到需要修改的旧编号。';
+  }
+
+  return array(
+    'category_id' => $category_id,
+    'category_name' => $category_name,
+    'old_prefix' => $old_prefix,
+    'new_prefix' => $new_prefix,
+    'total_count' => count($rows),
+    'change_count' => count($changes),
+    'unchanged_count' => count($unchanged),
+    'blocked_count' => count($blocked),
+    'conflict_count' => count($conflicts),
+    'issue_count' => count($blocked) + count($conflicts),
+    'changes' => $changes,
+    'changes_preview' => array_slice($changes, 0, 50),
+    'blocked' => $blocked,
+    'blocked_preview' => array_slice($blocked, 0, 20),
+    'conflicts' => $conflicts,
+    'conflicts_preview' => array_slice($conflicts, 0, 20),
+    'notice' => $notice,
+    'can_execute' => !empty($changes) && empty($blocked) && empty($conflicts),
+    );
+}
+
+function gzca_prefix_migration_signature($plan, $user_id, $issued_at)
+{
+  global $conf;
+  $rows = array();
+  foreach (isset($plan['changes']) ? $plan['changes'] : array() as $change)
+  {
+    $rows[] = array((int)$change['image_id'], $change['old_code'], $change['new_code']);
+  }
+  $blocked = array();
+  foreach (isset($plan['blocked']) ? $plan['blocked'] : array() as $item)
+  {
+    $blocked[] = array((int)$item['image_id'], $item['old_code']);
+  }
+  $conflicts = array();
+  foreach (isset($plan['conflicts']) ? $plan['conflicts'] : array() as $item)
+  {
+    $conflicts[] = array((int)$item['image_id'], $item['new_code'], (int)$item['occupied_image_id']);
+  }
+  $payload = json_encode(array(
+    'category_id' => (int)$plan['category_id'],
+    'old_prefix' => $plan['old_prefix'],
+    'new_prefix' => $plan['new_prefix'],
+    'issued_at' => (int)$issued_at,
+    'changes' => $rows,
+    'blocked' => $blocked,
+    'conflicts' => $conflicts,
+    ), JSON_UNESCAPED_UNICODE | JSON_UNESCAPED_SLASHES);
+  $secret = !empty($conf['secret_key'])
+    ? (string)$conf['secret_key']
+    : (function_exists('get_pwg_token') ? (string)get_pwg_token() : PHPWG_ROOT_PATH);
+  return hash_hmac('sha256', $payload, $secret.'|'.(int)$user_id);
+}
+
+function gzca_execute_prefix_migration_plan($plan, &$error)
+{
+  $error = '';
+  if (empty($plan['can_execute']) || empty($plan['changes']))
+  {
+    $error = '当前预览不满足执行条件，请重新检查冲突与异常编号。';
+    return false;
+  }
+
+  foreach ($plan['changes'] as $change)
+  {
+    gzca_save_work_meta(
+      (int)$change['image_id'],
+      $change['new_code'],
+      $change['status'],
+      $change['featured'],
+      $change['sort_order'],
+      $change['download_count']
+      );
+    single_update(
+      IMAGES_TABLE,
+      array('comment' => gzca_replace_embedded_code($change['comment'], $change['new_code'])),
+      array('id' => (int)$change['image_id'])
+      );
+  }
+
+  single_update(
+    GZCA_CATEGORIES_TABLE,
+    array(
+      'code_prefix' => $plan['new_prefix'],
+      'updated_at' => date('Y-m-d H:i:s'),
+      ),
+    array('category_id' => (int)$plan['category_id'])
+    );
+  invalidate_user_cache();
+  pwg_activity('album', (int)$plan['category_id'], 'edit', array('fields' => 'gzca_prefix_migration'));
+  return count($plan['changes']);
+}
+
 function gzca_save_category_meta($category_id, $prefix, $sort_order=0, $catalog_enabled=1, $direct_upload=1, $system_key=null, $category_kind=null, $reserved=null)
 {
   $category_id = (int)$category_id;
@@ -1951,13 +2512,24 @@ SELECT DISTINCT category_id
     );
 }
 
-function gzca_upload_works_batch($album_id, $uploads, $publish_now, $set_cover, &$errors=array())
+function gzca_upload_works_batch(
+  $album_id,
+  $uploads,
+  $publish_now,
+  $set_cover,
+  &$errors=array(),
+  $code_prefix=null,
+  $watermark_upload_confirmed=false
+)
 {
   global $conf;
 
   $errors = array();
   $album_id = (int)$album_id;
-  $prefix = gzca_category_prefix($album_id);
+  $custom_prefix = null !== $code_prefix;
+  $prefix = $custom_prefix && is_scalar($code_prefix)
+    ? gzca_normalize_code($code_prefix)
+    : ($custom_prefix ? '' : gzca_category_prefix($album_id));
   $uploads = is_array($uploads) ? $uploads : array();
   $batch_limits = gzca_upload_batch_limits();
   $result = array(
@@ -1968,6 +2540,7 @@ function gzca_upload_works_batch($album_id, $uploads, $publish_now, $set_cover, 
     'compressed_saved_bytes' => 0,
     'category_path' => '',
     'message' => '',
+    'watermark_enabled' => false,
     );
 
   if (!gzca_category_is_upload_target($album_id))
@@ -1975,9 +2548,11 @@ function gzca_upload_works_batch($album_id, $uploads, $publish_now, $set_cover, 
     $errors[] = '请选择可以直接上传作品的前台板块、分类或画展。';
     return $result;
   }
-  if (!gzca_valid_prefix($prefix))
+  if (!gzca_valid_prefix($prefix) || strlen($prefix) > 48)
   {
-    $errors[] = '所选分类尚未设置有效编号前缀，请先到分类管理中完善。';
+    $errors[] = $custom_prefix
+      ? '请输入有效编号前缀，例如 YH-FJ；只能使用英文字母、数字和连字符，每段不超过 12 位。'
+      : '所选分类尚未设置有效编号前缀，请先到分类管理中完善。';
     return $result;
   }
   if (empty($uploads))
@@ -2000,6 +2575,22 @@ function gzca_upload_works_batch($album_id, $uploads, $publish_now, $set_cover, 
   {
     $errors[] = '单批图片总大小不能超过 72 MB。当前批次约 '.gzca_format_bytes($upload_bytes).'，请减少每批数量。';
     return $result;
+  }
+
+  $watermark_state = gzca_frontend_watermark_state();
+  $result['watermark_enabled'] = !empty($watermark_state['enabled']);
+  if (empty($watermark_state['enabled']))
+  {
+    if (!empty($watermark_state['requested_enabled']))
+    {
+      $errors[] = '前台水印处于异常状态，已阻止上传。请先确认水印图层存在并重新开启水印。';
+      return $result;
+    }
+    if (empty($watermark_upload_confirmed))
+    {
+      $errors[] = '当前全站前台水印已关闭，请确认无水印上传风险后再继续。';
+      return $result;
+    }
   }
 
   if (!function_exists('add_uploaded_file'))
@@ -2107,7 +2698,10 @@ function gzca_upload_works_batch($album_id, $uploads, $publish_now, $set_cover, 
     $code_summary = empty($result['uploaded_codes'])
       ? ''
       : '，编号 '.reset($result['uploaded_codes']).(count($result['uploaded_codes']) > 1 ? ' 至 '.end($result['uploaded_codes']) : '');
-    $result['message'] = '已上传 '.$result['uploaded'].' 张作品到“'.$result['category_path'].'”'.$code_summary.'。';
+    $watermark_summary = $result['watermark_enabled']
+      ? '，前台图片已生成水印版本'
+      : '，当前前台水印已关闭';
+    $result['message'] = '已上传 '.$result['uploaded'].' 张作品到“'.$result['category_path'].'”'.$code_summary.$watermark_summary.'。';
   }
 
   return $result;
@@ -2246,7 +2840,7 @@ function gzca_prewarm_image_derivatives($image_ids, $types=null)
 
   if (null === $types)
   {
-    $types = array(IMG_XSMALL, IMG_THUMB, IMG_SQUARE);
+    $types = array(IMG_XSMALL, IMG_THUMB, IMG_SQUARE, IMG_XLARGE);
   }
 
   $rows = query2array('SELECT * FROM '.IMAGES_TABLE.' WHERE id IN ('.implode(',', $image_ids).');');
@@ -2312,6 +2906,54 @@ function gzca_prewarm_image_derivatives($image_ids, $types=null)
   return $warmed;
 }
 
+function gzca_prewarm_all_frontend_derivatives(&$error='', &$summary=array())
+{
+  $error = '';
+  $types = array(IMG_XSMALL, IMG_THUMB, IMG_SQUARE, IMG_XLARGE);
+  $rows = query2array('SELECT * FROM '.IMAGES_TABLE.' ORDER BY id;');
+  $image_ids = array_map('intval', array_column($rows, 'id'));
+  $expected = count($image_ids) * count($types);
+  $warmed = empty($image_ids) ? 0 : gzca_prewarm_image_derivatives($image_ids, $types);
+  $public_expected = count($image_ids) * 2;
+  $public_ready = 0;
+  if ($warmed === $expected)
+  {
+    foreach ($rows as $row)
+    {
+      foreach (array(IMG_XSMALL, IMG_XLARGE) as $type)
+      {
+        $url = gzca_image_derivative_url($row, $type);
+        if (gzca_frontend_public_image_url_is_ready($url))
+        {
+          $public_ready++;
+        }
+      }
+    }
+  }
+  $summary = array(
+    'images' => count($image_ids),
+    'types' => count($types),
+    'expected' => $expected,
+    'warmed' => $warmed,
+    'public_expected' => $public_expected,
+    'public_ready' => $public_ready,
+    );
+
+  if ($warmed !== $expected)
+  {
+    $error = '仅成功生成 '.$warmed.'/'.$expected.' 个前台图片版本。';
+    return false;
+  }
+
+  if ($public_ready !== $public_expected)
+  {
+    $error = '仅成功准备 '.$public_ready.'/'.$public_expected.' 个前台轻量图片版本。';
+    return false;
+  }
+
+  return true;
+}
+
 
 function gzca_try_compress_with_imagick($source_filepath, $target_filepath, $limits)
 {
@@ -2352,6 +2994,7 @@ function gzca_try_compress_with_imagick($source_filepath, $target_filepath, $lim
     {
       $canvas->setImageCompressionQuality($quality);
       $canvas->writeImage($target_filepath);
+      clearstatcache(true, $target_filepath);
       if (@filesize($target_filepath) <= $limits['max_bytes'])
       {
         break;
@@ -2424,6 +3067,7 @@ function gzca_try_compress_with_gd($source_filepath, $target_filepath, $image_ty
   foreach ($limits['qualities'] as $quality)
   {
     imagejpeg($target, $target_filepath, $quality);
+    clearstatcache(true, $target_filepath);
     if (@filesize($target_filepath) <= $limits['max_bytes'])
     {
       break;
@@ -2526,12 +3170,165 @@ function gzca_prepare_upload_image_file($source_filepath, $original_filename, &$
   return $compression_info;
 }
 
+function gzca_frontend_image_max_bytes()
+{
+  return 1024 * 1024;
+}
+
+function gzca_path_is_within($path, $root)
+{
+  $path = realpath($path);
+  $root = realpath($root);
+  if (false === $path || false === $root)
+  {
+    return false;
+  }
+  $path = rtrim(str_replace('\\', '/', $path), '/');
+  $root = rtrim(str_replace('\\', '/', $root), '/');
+  return $path === $root || 0 === strpos($path, $root.'/');
+}
+
+function gzca_build_frontend_preview($source_filepath, $target_filepath)
+{
+  $image_info = @getimagesize($source_filepath);
+  if (empty($image_info) || !isset($image_info[2]))
+  {
+    return false;
+  }
+
+  $temp_filepath = $target_filepath.'.tmp-'.substr(sha1(uniqid('', true)), 0, 10);
+  $max_bytes = gzca_frontend_image_max_bytes();
+  foreach (array(918, 840, 760, 680) as $max_side)
+  {
+    @unlink($temp_filepath);
+    $limits = array(
+      'max_bytes' => $max_bytes,
+      'max_side' => $max_side,
+      'qualities' => array(82, 78, 74, 70, 66, 60),
+      );
+    $ok = gzca_try_compress_with_imagick($source_filepath, $temp_filepath, $limits);
+    if (!$ok)
+    {
+      $ok = gzca_try_compress_with_gd($source_filepath, $temp_filepath, (int)$image_info[2], $limits);
+    }
+    clearstatcache(true, $temp_filepath);
+    if ($ok && is_file($temp_filepath) && filesize($temp_filepath) > 0 && filesize($temp_filepath) <= $max_bytes)
+    {
+      @chmod($temp_filepath, 0644);
+      if (@rename($temp_filepath, $target_filepath))
+      {
+        return true;
+      }
+    }
+  }
+
+  @unlink($temp_filepath);
+  return false;
+}
+
+function gzca_frontend_preview_url($image, $type, $source_filepath)
+{
+  if (!is_file($source_filepath))
+  {
+    return '';
+  }
+
+  $cache_dir = gzca_derivative_cache_path().'/gzca-preview';
+  if (!is_dir($cache_dir) && !@mkdir($cache_dir, 0755, true) && !is_dir($cache_dir))
+  {
+    return '';
+  }
+
+  $image_id = max(0, (int)(isset($image['id']) ? $image['id'] : 0));
+  $safe_type = preg_replace('/[^a-z0-9_-]+/i', '-', (string)$type);
+  $signature = substr(sha1($source_filepath.'|'.@filemtime($source_filepath).'|'.@filesize($source_filepath)), 0, 14);
+  $filename = $image_id.'-'.$safe_type.'-'.$signature.'.jpg';
+  $target_filepath = $cache_dir.'/'.$filename;
+
+  if (!is_file($target_filepath) || filesize($target_filepath) < 1 || filesize($target_filepath) > gzca_frontend_image_max_bytes())
+  {
+    if (!gzca_build_frontend_preview($source_filepath, $target_filepath))
+    {
+      return '';
+    }
+    foreach ((array)glob($cache_dir.'/'.$image_id.'-'.$safe_type.'-*.jpg') as $old_filepath)
+    {
+      if ($old_filepath !== $target_filepath)
+      {
+        @unlink($old_filepath);
+      }
+    }
+  }
+
+  $relative_path = ltrim(str_replace('\\', '/', substr($target_filepath, strlen(PHPWG_ROOT_PATH))), '/');
+  return get_root_url().$relative_path.'?v='.(int)filemtime($target_filepath);
+}
+
+function gzca_frontend_public_image_url_is_ready($url)
+{
+  $path = parse_url((string)$url, PHP_URL_PATH);
+  if (!is_string($path) || '' === $path)
+  {
+    return false;
+  }
+  $path = rawurldecode($path);
+  $root_path = rtrim(str_replace('\\', '/', PHPWG_ROOT_PATH), '/');
+  $normalized_path = str_replace('\\', '/', $path);
+  $filepath = $normalized_path === $root_path || 0 === strpos($normalized_path, $root_path.'/')
+    ? $normalized_path
+    : PHPWG_ROOT_PATH.ltrim($normalized_path, '/');
+  return is_file($filepath)
+    && gzca_path_is_within($filepath, gzca_derivative_cache_path())
+    && filesize($filepath) > 0
+    && filesize($filepath) <= gzca_frontend_image_max_bytes();
+}
+
 function gzca_image_derivative_url($image, $type)
 {
   try
   {
     $source = new SrcImage($image);
-    return DerivativeImage::url($type, $source);
+    $derivative = DerivativeImage::get_one($type, $source);
+    if (null === $derivative)
+    {
+      return '';
+    }
+
+    $url = $derivative->get_url();
+    $path = $derivative->get_path();
+    if (!is_file($path) && !empty($image['id']))
+    {
+      gzca_prewarm_image_derivatives(array((int)$image['id']), array($type));
+      $derivative = DerivativeImage::get_one($type, $source);
+      $url = null === $derivative ? '' : $derivative->get_url();
+      $path = null === $derivative ? '' : $derivative->get_path();
+    }
+    if ('' === $url || !is_file($path))
+    {
+      return '';
+    }
+
+    if (!gzca_path_is_within($path, gzca_derivative_cache_path()) || filesize($path) > gzca_frontend_image_max_bytes())
+    {
+      return gzca_frontend_preview_url($image, $type, $path);
+    }
+
+    $version = @filemtime($path);
+    if (false === $version)
+    {
+      $params = ImageStdParams::get_by_type($type);
+      $version = is_object($params) ? (int)$params->last_mod_time : 0;
+    }
+    if ($version < 1)
+    {
+      return $url;
+    }
+
+    if (false !== strpos($url, 'i.php?'))
+    {
+      return $url.'&b='.$version;
+    }
+    return $url.(false === strpos($url, '?') ? '?' : '&').'v='.$version;
   }
   catch (Throwable $error)
   {
