@@ -1046,12 +1046,16 @@ function gzca_normalize_code($value)
 
 function gzca_valid_code($value)
 {
-  return (bool)preg_match('/^[A-Z0-9]{2,12}(?:-[A-Z0-9]{1,12})*-\d{3,6}$/', gzca_normalize_code($value));
+  $value = gzca_normalize_code($value);
+  return strlen($value) <= 64
+    && (bool)preg_match('/^[A-Z0-9]{2,12}(?:-[A-Z0-9]{1,12})*-\d{3,6}$/', $value);
 }
 
 function gzca_valid_prefix($value)
 {
-  return (bool)preg_match('/^[A-Z0-9]{2,12}(?:-[A-Z0-9]{1,12})*$/', gzca_normalize_code($value));
+  $value = gzca_normalize_code($value);
+  return strlen($value) <= 48
+    && (bool)preg_match('/^[A-Z0-9]{2,12}(?:-[A-Z0-9]{1,12})*$/', $value);
 }
 
 function gzca_strip_markers($comment)
@@ -1078,7 +1082,7 @@ function gzca_embed_prefix($comment, $prefix)
 
 function gzca_extract_code($comment, $fallback='')
 {
-  if (preg_match('/GZCA_CODE:([A-Z0-9-]+)/i', (string)$comment, $matches))
+  if (preg_match('/GZCA_CODE:([A-Z0-9-]*[A-Z0-9])(?=\s*(?:-->|$))/i', (string)$comment, $matches))
   {
     return strtoupper($matches[1]);
   }
@@ -1647,9 +1651,30 @@ SELECT
   $target_sources = array();
   foreach ($changes as $change)
   {
-    $target_sources[$change['new_code']] = (int)$change['image_id'];
+    if (!isset($target_sources[$change['new_code']]))
+    {
+      $target_sources[$change['new_code']] = array();
+    }
+    $target_sources[$change['new_code']][] = (int)$change['image_id'];
   }
   $conflicts = array();
+  foreach ($target_sources as $target_code => $source_ids)
+  {
+    if (count($source_ids) < 2)
+    {
+      continue;
+    }
+    foreach ($source_ids as $source_id)
+    {
+      $other_ids = array_values(array_diff($source_ids, array($source_id)));
+      $conflicts[] = array(
+        'image_id' => (int)$source_id,
+        'new_code' => $target_code,
+        'occupied_image_id' => (int)$other_ids[0],
+        'reason' => '同一批迁移中有多张作品生成了相同编号。',
+        );
+    }
+  }
   if (!empty($target_sources))
   {
     $escaped_targets = array_map(function ($code) {
@@ -1661,10 +1686,10 @@ SELECT
     foreach ($conflict_rows as $conflict_row)
     {
       $code = gzca_normalize_code($conflict_row['code']);
-      if (isset($target_sources[$code]) && (int)$conflict_row['image_id'] !== (int)$target_sources[$code])
+      if (isset($target_sources[$code]) && !in_array((int)$conflict_row['image_id'], $target_sources[$code], true))
       {
         $conflicts[] = array(
-          'image_id' => (int)$target_sources[$code],
+          'image_id' => (int)$target_sources[$code][0],
           'new_code' => $code,
           'occupied_image_id' => (int)$conflict_row['image_id'],
           'reason' => '目标编号已被其他作品占用。',

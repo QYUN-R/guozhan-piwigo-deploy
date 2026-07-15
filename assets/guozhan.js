@@ -1543,6 +1543,7 @@
         }
         if (scrollToGrid) grid.scrollIntoView({ behavior: "smooth", block: "start" });
       } catch (error) {
+        if (expectedGeneration !== generation) return;
         console.error("Guozhan works API unavailable", error);
         grid.innerHTML = '<div class="empty-state">作品加载失败，请稍后重试。</div>';
         finalMessage = "作品加载失败";
@@ -1585,6 +1586,7 @@
     const filters = context.isCaaBoard ? [] : (context.data.direct ? ["全部"] : ["全部"].concat(context.data.tags || []));
     let allWorks = [];
     let currentSort = sortSelect?.value || "custom";
+    let reloadGeneration = 0;
 
     document.title = context.title + " · " + BRAND_NAME;
     document.querySelectorAll("[data-category-parent]").forEach((node) => { node.textContent = context.parentName; });
@@ -1624,17 +1626,22 @@
     }
 
     async function reload() {
-      currentSort = sortSelect?.value || "custom";
+      const expectedGeneration = ++reloadGeneration;
+      const requestedSort = sortSelect?.value || "custom";
+      currentSort = requestedSort;
       update();
       try {
-        const query = { sort: currentSort, recursive: true, fallbackKey: context.key };
+        const query = { sort: requestedSort, recursive: true, fallbackKey: context.key };
         if (context.apiCategory?.id) {
           query.cat_id = context.apiCategory.id;
         }
         else if (context.isCaaBoard) query.query = "ZX-";
         else query.query = context.title;
-        allWorks = await fetchApiWorks(query, 100);
+        const works = await fetchApiWorks(query, 100);
+        if (expectedGeneration !== reloadGeneration) return;
+        allWorks = works;
       } catch (error) {
+        if (expectedGeneration !== reloadGeneration) return;
         console.error("Guozhan category works API unavailable", error);
         allWorks = [];
       }

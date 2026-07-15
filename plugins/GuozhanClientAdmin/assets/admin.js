@@ -11,7 +11,8 @@
   }
 
   function validCodePrefix(value) {
-    return /^[A-Z0-9]{2,12}(?:-[A-Z0-9]{1,12})*$/.test(normalizeCodePrefix(value));
+    var normalized = normalizeCodePrefix(value);
+    return normalized.length <= 48 && /^[A-Z0-9]{2,12}(?:-[A-Z0-9]{1,12})*$/.test(normalized);
   }
 
   function initMobileNavigation() {
@@ -238,6 +239,10 @@
         var token = form.querySelector("input[name='pwg_token']");
         var publishNow = form.querySelector("input[name='publish_now'][value='1']");
         var setCover = form.querySelector("input[name='set_cover']");
+        var albumId = category.value;
+        var publishNowValue = publishNow && publishNow.checked ? "1" : "0";
+        var setCoverRequested = Boolean(setCover && setCover.checked);
+        var watermarkUploadConfirmedValue = watermarkUploadConfirmed ? watermarkUploadConfirmed.value : "";
         var oversized = files.filter(function (file) { return file.size > maxBatchBytes; });
         if (oversized.length) {
           showNotice("单张图片过大", "“" + oversized[0].name + "”超过 72 MB，请先压缩后再上传。");
@@ -264,11 +269,11 @@
             if (token) data.append("pwg_token", token.value);
             data.append("gzca_action", "upload_works");
             data.append("gzca_async", "1");
-            data.append("album_id", category.value);
+            data.append("album_id", albumId);
             data.append("code_prefix", codePrefix);
-            data.append("publish_now", publishNow && publishNow.checked ? "1" : "0");
-            if (watermarkUploadConfirmed) data.append("watermark_upload_confirmed", watermarkUploadConfirmed.value);
-            if (setCover && setCover.checked && batchIndex === 0) data.append("set_cover", "1");
+            data.append("publish_now", publishNowValue);
+            if (watermarkUploadConfirmed) data.append("watermark_upload_confirmed", watermarkUploadConfirmedValue);
+            if (setCoverRequested && batchIndex === 0) data.append("set_cover", "1");
             batch.forEach(function (file) { data.append("artworks[]", file, file.name); });
 
             setProgress(uploaded + failed, files.length, "正在上传第 " + (batchIndex + 1) + " / " + batches.length + " 批（" + batch.length + " 张）");
