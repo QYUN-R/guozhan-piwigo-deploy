@@ -127,7 +127,7 @@
       (d.xsmall && d.xsmall.url) ||
       (d.thumb && d.thumb.url) ||
       (d.square && d.square.url) ||
-      root + "art-placeholder.svg";
+      root + "art-placeholder.svg?v=20260716-media-integrity-1";
   }
 
   function detailImageUrl(image) {
@@ -788,7 +788,7 @@
     var cleanCode = code ? code[0].toUpperCase() : "ID-" + pictureIdFromUrl();
     var categoryLink = Array.prototype.slice.call(nativeRoot.querySelectorAll("a[href*='/category/']")).pop();
     var categoryText = categoryLink ? categoryLink.textContent.trim() : "作品分类";
-    var src = mainImage ? mainImage.src : root + "art-placeholder.svg";
+    var src = mainImage ? mainImage.src : root + "art-placeholder.svg?v=20260716-media-integrity-1";
     var desc = mainImage && mainImage.title ? mainImage.title : "可凭作品编号咨询高清素材与同类作品。";
 
     document.title = title + " · " + cleanCode;

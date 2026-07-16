@@ -188,6 +188,10 @@
     return assetPrefix() + "works/" + (workImages[top] || "mixed-material.jpg");
   }
 
+  function processingImageUrl() {
+    return assetPrefix() + "art-placeholder.svg?v=20260716-media-integrity-1";
+  }
+
   function padCode(index) {
     return String(index + 1).padStart(3, "0");
   }
@@ -525,6 +529,15 @@
   }
 
   function wireCommon() {
+    document.addEventListener("error", (event) => {
+      const image = event.target;
+      if (!(image instanceof HTMLImageElement) || image.getAttribute("data-api-image") !== "true") return;
+      if (image.getAttribute("data-processing-fallback") === "true") return;
+      image.setAttribute("data-processing-fallback", "true");
+      image.setAttribute("data-image-ready", "false");
+      image.src = processingImageUrl();
+    }, true);
+
     const menuToggle = document.querySelector("[data-menu-toggle]");
     const nav = document.querySelector("[data-nav]");
     if (menuToggle && nav) {
@@ -1556,22 +1569,24 @@
   function renderWorkCard(item, detailBase, renderOptions) {
     const options = renderOptions || {};
     const href = item.href || (detailBase ? detailBase(item.code, item.key, item) : workDetailHref(item));
-    const imageSrc = item.thumbUrl || imageForCode(item.code);
+    const imageReady = Boolean(item.thumbUrl);
+    const imageSrc = item.thumbUrl || processingImageUrl();
     const loading = options.eager ? "eager" : "lazy";
     const fetchPriority = options.eager ? "high" : "auto";
     const width = Math.max(1, Number(item.thumbWidth || 4));
     const height = Math.max(1, Number(item.thumbHeight || 3));
     return '<a class="work-card" href="' + escapeHtml(href) + '" data-code="' + escapeHtml(item.code) + '"' + (item.id ? ' data-image-id="' + escapeHtml(item.id) + '"' : "") + '>' +
-      '<figure class="work-thumb"><span class="code-badge">' + escapeHtml(item.code) + '</span><img loading="' + loading + '" fetchpriority="' + fetchPriority + '" decoding="async" width="' + width + '" height="' + height + '" data-api-image="' + (item.thumbUrl ? "true" : "false") + '" src="' + escapeHtml(imageSrc) + '" alt="' + escapeHtml(item.code) + '"></figure>' +
+      '<figure class="work-thumb"><span class="code-badge">' + escapeHtml(item.code) + '</span><img loading="' + loading + '" fetchpriority="' + fetchPriority + '" decoding="async" width="' + width + '" height="' + height + '" data-api-image="true" data-image-ready="' + (imageReady ? "true" : "false") + '" src="' + escapeHtml(imageSrc) + '" alt="' + escapeHtml(imageReady ? item.code : item.code + " 图片处理中") + '"></figure>' +
       '<div class="work-caption work-caption-compact"><p class="card-meta">' + escapeHtml(item.meta) + '</p><p class="work-code-line">作品编号：' + escapeHtml(item.code) + '</p></div>' +
     '</a>';
   }
 
   function renderResultCard(item) {
     const href = workDetailHref(item);
-    const imageSrc = item.thumbUrl || imageForCode(item.code);
+    const imageReady = Boolean(item.thumbUrl);
+    const imageSrc = item.thumbUrl || processingImageUrl();
     return '<article class="result-card" data-code="' + escapeHtml(item.code) + '">' +
-      '<a class="work-thumb" href="' + escapeHtml(href) + '"><span class="code-badge">' + escapeHtml(item.code) + '</span><img loading="lazy" decoding="async" data-api-image="' + (item.thumbUrl ? "true" : "false") + '" src="' + escapeHtml(imageSrc) + '" alt="' + escapeHtml(item.code) + '"></a>' +
+      '<a class="work-thumb" href="' + escapeHtml(href) + '"><span class="code-badge">' + escapeHtml(item.code) + '</span><img loading="lazy" decoding="async" data-api-image="true" data-image-ready="' + (imageReady ? "true" : "false") + '" src="' + escapeHtml(imageSrc) + '" alt="' + escapeHtml(imageReady ? item.code : item.code + " 图片处理中") + '"></a>' +
       '<div class="work-caption work-caption-compact"><p class="card-meta">' + escapeHtml(item.meta) + '</p><p class="work-code-line">作品编号：' + escapeHtml(item.code) + '</p></div>' +
       '<a class="btn btn-secondary" href="' + escapeHtml(href) + '">查看详情</a>' +
     '</article>';
@@ -1813,7 +1828,7 @@
     setTextAll("[data-detail-desc]", "该作品当前未在前台公开展示。如需确认，请联系管理员在后台检查作品状态。");
     const mainImage = document.querySelector(".detail-art img");
     if (mainImage) {
-      mainImage.src = assetPrefix() + "art-placeholder.svg";
+      mainImage.src = processingImageUrl();
       mainImage.alt = "作品不可用";
       mainImage.removeAttribute("data-api-image");
     }
@@ -1868,9 +1883,11 @@
       setTextAll("[data-detail-desc]", work.desc || "作品已从后台数据库读取。");
       const mainImage = document.querySelector(".detail-art img");
       if (mainImage) {
-        mainImage.src = work.displayUrl || work.thumbUrl || imageForCode(work.code);
+        const imageReady = Boolean(work.displayUrl || work.thumbUrl);
+        mainImage.src = work.displayUrl || work.thumbUrl || processingImageUrl();
         mainImage.alt = work.title;
-        mainImage.setAttribute("data-api-image", work.displayUrl || work.thumbUrl ? "true" : "false");
+        mainImage.setAttribute("data-api-image", "true");
+        mainImage.setAttribute("data-image-ready", imageReady ? "true" : "false");
       }
       document.querySelectorAll("[data-detail-category-link], [data-related-more], [data-back-list]").forEach((link) => link.setAttribute("href", categoryListHref(work.key)));
       const relatedTitle = document.querySelector("[data-related-title]");
