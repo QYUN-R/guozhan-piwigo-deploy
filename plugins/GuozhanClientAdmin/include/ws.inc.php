@@ -44,10 +44,22 @@ function gzca_ws_categories_get_list($params, &$service)
       $result = pwg_query('
 SELECT i.*
   FROM '.IMAGES_TABLE.' AS i
-    LEFT JOIN '.GZCA_WORKS_TABLE.' AS gw ON gw.image_id = i.id
+    INNER JOIN '.GZCA_WORKS_TABLE.' AS gw ON gw.image_id = i.id
+    INNER JOIN '.IMAGE_CATEGORY_TABLE.' AS cover_ic
+      ON cover_ic.image_id = i.id
+     AND cover_ic.category_id = '.(int)$category['id'].'
+    INNER JOIN '.CATEGORIES_TABLE.' AS cover_c
+      ON cover_c.id = cover_ic.category_id
   WHERE i.id = '.(int)$category['representative_picture_id'].'
     AND i.level = 0
-    AND (gw.status IS NULL OR gw.status = \'online\')
+    AND gw.status = \'online\'
+    AND cover_c.visible = \'true\'
+    AND cover_c.status = \'public\'
+    AND NOT EXISTS (
+      SELECT 1 FROM '.CATEGORIES_TABLE.' AS hidden_c
+      WHERE FIND_IN_SET(hidden_c.id, cover_c.uppercats) > 0
+        AND (hidden_c.visible <> \'true\' OR hidden_c.status <> \'public\')
+    )
   LIMIT 1
 ;');
       if (pwg_db_num_rows($result) > 0)
@@ -232,26 +244,20 @@ SELECT
     if ($include_detail)
     {
       $detail_derivatives = array();
-      $allowed_detail_derivatives = array('xsmall', 'small', 'medium', 'large', 'xlarge');
-      foreach ($allowed_detail_derivatives as $derivative_name)
+      if (isset($standard_urls['derivatives']['xsmall']))
       {
-        if (isset($standard_urls['derivatives'][$derivative_name]))
+        $safe_xsmall_url = gzca_image_derivative_url($row, IMG_XSMALL);
+        if ('' !== $safe_xsmall_url)
         {
-          $detail_derivatives[$derivative_name] = $standard_urls['derivatives'][$derivative_name];
+          $detail_derivatives['xsmall'] = $standard_urls['derivatives']['xsmall'];
+          $detail_derivatives['xsmall']['url'] = $safe_xsmall_url;
         }
       }
 
       $display_url = gzca_image_derivative_url($row, IMG_XLARGE);
       if ('' === $display_url)
       {
-        foreach (array('xlarge', 'large', 'medium') as $fallback_type)
-        {
-          if (!empty($detail_derivatives[$fallback_type]['url']))
-          {
-            $display_url = $detail_derivatives[$fallback_type]['url'];
-            break;
-          }
-        }
+        $display_url = gzca_image_derivative_url($row, IMG_XSMALL);
       }
       $safe_urls = array(
         'page_url' => gzca_frontend_url('detail', array('image_id' => (int)$row['id'], 'code' => $code)),
@@ -263,16 +269,13 @@ SELECT
     else
     {
       $thumbnail_derivatives = array();
-      $allowed_thumbnail_derivatives = array('xsmall', 'thumb', 'square');
-      foreach ($allowed_thumbnail_derivatives as $derivative_name)
+      $thumbnail_url = gzca_image_list_url($row);
+      if ('' !== $thumbnail_url && isset($standard_urls['derivatives']['xsmall']))
       {
-        if (isset($standard_urls['derivatives'][$derivative_name]))
-        {
-          $thumbnail_derivatives[$derivative_name] = $standard_urls['derivatives'][$derivative_name];
-        }
+        $thumbnail_derivatives['xsmall'] = $standard_urls['derivatives']['xsmall'];
+        $thumbnail_derivatives['xsmall']['url'] = $thumbnail_url;
       }
 
-      $thumbnail_url = gzca_image_list_url($row);
       $safe_urls = array(
         'page_url' => gzca_frontend_url('detail', array('image_id' => (int)$row['id'], 'code' => $code)),
         'thumbnail_url' => $thumbnail_url,

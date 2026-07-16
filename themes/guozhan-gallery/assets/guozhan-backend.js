@@ -31,9 +31,10 @@
   }
 
   function stripHtml(value) {
-    var div = document.createElement("div");
-    div.innerHTML = String(value || "");
-    return div.textContent.replace(/\s+/g, " ").trim();
+    return String(value || "")
+      .replace(/<[^>]*>/g, " ")
+      .replace(/\s+/g, " ")
+      .trim();
   }
 
   function ws(method, values) {
@@ -78,12 +79,46 @@
     return String(a) === String(b);
   }
 
+  function categoryDisplayName(cat) {
+    return stripHtml(cat && cat.name || "").replace(/\s+/g, "");
+  }
+
+  function namedCategoryRank(name) {
+    if (/梅花之韵|中国画花鸟作品展|梅花/.test(name)) return 10;
+    if (/山水滋美|风景油画展/.test(name)) return 20;
+    if (/第五届青年漆画|青年漆画/.test(name)) return 30;
+    return null;
+  }
+
+  function unknownCategoryNumber(name) {
+    var match = name.match(/未知画展0*(\d+)/);
+    return match ? parseInt(match[1], 10) : null;
+  }
+
+  function categoryOrderValue(cat) {
+    var name = categoryDisplayName(cat);
+    var namedRank = namedCategoryRank(name);
+    if (namedRank !== null) return [0, namedRank, name];
+    var unknownNo = unknownCategoryNumber(name);
+    if (unknownNo !== null) return [1, unknownNo, name];
+    var rank = Number(cat && cat.rank);
+    return [2, Number.isFinite(rank) && rank > 0 ? rank : 9999, name];
+  }
+
+  function orderedCategories(items) {
+    return (items || []).slice().sort(function (a, b) {
+      var left = categoryOrderValue(a);
+      var right = categoryOrderValue(b);
+      return left[0] - right[0] || left[1] - right[1] || left[2].localeCompare(right[2], "zh-Hans-CN");
+    });
+  }
+
   function childCategories(categories, parentId) {
-    return categories.filter(function (cat) { return sameId(cat.id_uppercat, parentId); });
+    return orderedCategories(categories.filter(function (cat) { return sameId(cat.id_uppercat, parentId); }));
   }
 
   function topCategories(categories) {
-    return categories.filter(isTopCategory);
+    return orderedCategories(categories.filter(isTopCategory));
   }
 
   function thumbnailImageUrl(image) {
@@ -92,7 +127,7 @@
       (d.xsmall && d.xsmall.url) ||
       (d.thumb && d.thumb.url) ||
       (d.square && d.square.url) ||
-      root + "art-placeholder.svg";
+      root + "art-placeholder.svg?v=20260716-media-integrity-1";
   }
 
   function detailImageUrl(image) {
@@ -155,6 +190,45 @@
     return cat && cat.id ? appUrl("category", { cat_id: cat.id }) : appUrl("categories");
   }
 
+  function createPageJump(pagination, onJump) {
+    if (!pagination || typeof onJump !== "function") return null;
+    var form = pagination.querySelector("[data-page-jump]");
+    if (!form) {
+      form = document.createElement("form");
+      form.className = "page-jump";
+      form.setAttribute("data-page-jump", "");
+      form.innerHTML = '<label><span>跳到</span><input class="page-jump-input" data-page-jump-input type="number" min="1" step="1" inputmode="numeric" aria-label="跳转页码"><span>页</span></label><button class="btn btn-secondary page-jump-button" type="submit" data-page-jump-submit>跳转</button>';
+      pagination.appendChild(form);
+    }
+    var input = form.querySelector("[data-page-jump-input]");
+    var submit = form.querySelector("[data-page-jump-submit]");
+    if (!input || !submit) return null;
+
+    form.onsubmit = function (event) {
+      event.preventDefault();
+      var maxPage = Math.max(1, parseInt(input.max, 10) || 1);
+      var rawPage = parseInt(input.value, 10);
+      if (!Number.isFinite(rawPage)) {
+        input.focus();
+        return;
+      }
+      var targetPage = Math.min(maxPage, Math.max(1, rawPage));
+      input.value = String(targetPage);
+      onJump(targetPage - 1);
+    };
+
+    return {
+      update: function (currentPage, totalPages, disabled) {
+        var safeTotal = Math.max(1, Number(totalPages) || 1);
+        var safeCurrent = Math.min(safeTotal, Math.max(1, Number(currentPage) + 1 || 1));
+        input.max = String(safeTotal);
+        if (document.activeElement !== input) input.value = String(safeCurrent);
+        input.disabled = Boolean(disabled) || safeTotal <= 1;
+        submit.disabled = Boolean(disabled) || safeTotal <= 1;
+      }
+    };
+  }
+
   function renderPager(container, pagination, items, pageSize, renderItem, unit) {
     if (!container || !pagination) return;
     var page = 0;
@@ -162,6 +236,11 @@
     var next = pagination.querySelector("[data-home-next], [data-page-next]");
     var status = pagination.querySelector("[data-home-status], [data-page-status]");
     var afterRender = typeof arguments[6] === "function" ? arguments[6] : null;
+    var jump = createPageJump(pagination, function (targetPage) {
+      page = targetPage;
+      draw();
+      container.scrollIntoView({ behavior: "smooth", block: "start" });
+    });
 
     function draw() {
       var total = Math.max(1, Math.ceil(items.length / pageSize));
@@ -173,6 +252,7 @@
       if (status) status.textContent = "第 " + (page + 1) + " / " + total + " 页 · 共 " + items.length + " " + (unit || "张");
       if (prev) prev.disabled = page === 0;
       if (next) next.disabled = page >= total - 1;
+      if (jump) jump.update(page, total, false);
     }
 
     if (prev) prev.onclick = function () {
@@ -198,15 +278,22 @@
     var totalPages = 1;
     var loader = null;
     var requestId = 0;
+    var fallbackHtml = container.innerHTML;
     var prev = pagination.querySelector("[data-home-prev], [data-page-prev]");
     var next = pagination.querySelector("[data-home-next], [data-page-next]");
     var status = pagination.querySelector("[data-home-status], [data-page-status]");
+    var jump = createPageJump(pagination, function (targetPage) {
+      page = targetPage;
+      draw();
+      container.scrollIntoView({ behavior: "smooth", block: "start" });
+    });
 
     function draw() {
       if (!loader) return Promise.resolve();
       var currentRequest = ++requestId;
       container.setAttribute("aria-busy", "true");
       container.innerHTML = '<div class="empty-state">正在整理作品列表...</div>';
+      if (jump) jump.update(page, totalPages, true);
       return loader(page, pageSize).then(function (result) {
         if (currentRequest !== requestId) return;
         var items = result && result.images || [];
@@ -214,11 +301,18 @@
         var totalCount = Number(paging.total_count == null ? items.length : paging.total_count);
         totalPages = Math.max(1, Math.ceil(totalCount / pageSize));
         page = Math.min(page, totalPages - 1);
-        container.innerHTML = items.length ? items.map(renderItem).join("") : '<div class="empty-state">未找到符合条件的作品</div>';
+        if (items.length) {
+          container.innerHTML = items.map(renderItem).join("");
+        } else if (fallbackHtml && fallbackHtml.trim()) {
+          container.innerHTML = fallbackHtml;
+        } else {
+          container.innerHTML = '<div class="empty-state">未找到符合条件的作品</div>';
+        }
         container.removeAttribute("aria-busy");
         if (status) status.textContent = "第 " + (page + 1) + " / " + totalPages + " 页 · 共 " + totalCount + " " + (unit || "张");
         if (prev) prev.disabled = page === 0;
         if (next) next.disabled = page >= totalPages - 1;
+        if (jump) jump.update(page, totalPages, false);
       }).catch(function () {
         if (currentRequest !== requestId) return;
         container.removeAttribute("aria-busy");
@@ -226,6 +320,7 @@
         if (status) status.textContent = "加载失败";
         if (prev) prev.disabled = true;
         if (next) next.disabled = true;
+        if (jump) jump.update(page, totalPages, true);
       });
     }
 
@@ -336,12 +431,6 @@
       });
   }
 
-  function fetchCompetitionMedia() {
-    return ws("gzca.competition.getMedia", {})
-      .then(function (result) { return result.media || []; })
-      .catch(function () { return []; });
-  }
-
   function fetchContact() {
     return ws("gzca.contact.get", {}).catch(function () { return null; });
   }
@@ -391,13 +480,11 @@
       query: options.query || ""
     };
     if (options.catId) values.cat_id = options.catId;
-    if (options.competition !== undefined) values.competition = options.competition || "";
     return ws("gzca.images.getList", values).then(function (result) {
       customApiAvailable = true;
       return normalizePage(result, values.page, values.per_page);
     }).catch(function (error) {
       customApiAvailable = null;
-      if (options.sort === "competition" || options.competition !== undefined) throw error;
       return fetchCoreImagePage(options);
     });
   }
@@ -440,71 +527,6 @@
     return renderHomeImages(active ? active.getAttribute("data-home-sort") : "featured");
   }
 
-  function applyCompetition() {
-    var query = params.get("q") || "";
-    var requestedCompetition = params.get("competition") || "";
-    var input = app.querySelector("input[name='q']");
-    if (input) input.value = query;
-
-    var grid = app.querySelector("[data-home-stream]");
-    var pagination = app.querySelector("[data-home-pagination]");
-    var pager = createRemotePager(grid, pagination, 16, function (image) {
-      return renderWorkCard(image, image.competition && image.competition.name || "比赛作品");
-    }, "张");
-    if (!pager) return Promise.resolve();
-
-    function updateCompetitionUrl(slug) {
-      if (!window.history || typeof window.history.replaceState !== "function") return;
-      var next = new URL(window.location.href);
-      next.searchParams.set("gz_page", "competition");
-      if (slug) next.searchParams.set("competition", slug);
-      else next.searchParams.delete("competition");
-      if (query) next.searchParams.set("q", query);
-      else next.searchParams.delete("q");
-      window.history.replaceState(null, "", next.pathname + next.search + next.hash);
-      params = new URLSearchParams(next.search);
-    }
-
-    function renderForCompetition(slug) {
-      return pager.setLoader(function (pageNumber, pageSize) {
-        return fetchImagePage({
-          competition: slug || "",
-          query: query,
-          page: pageNumber,
-          perPage: pageSize,
-          sort: "competition"
-        });
-      });
-    }
-
-    return fetchCompetitionMedia().then(function (media) {
-      var row = app.querySelector("[data-filter-group]");
-      var activeSlug = requestedCompetition;
-      var items = [{ name: "全部", slug: "", work_count: null }].concat(media);
-      if (row) {
-        if (!media.some(function (item) { return String(item.slug || item.id || "") === activeSlug; })) {
-          activeSlug = "";
-        }
-        row.innerHTML = items.map(function (item) {
-          var slug = item.slug || (item.id ? String(item.id) : "");
-          var pressed = slug === activeSlug ? "true" : "false";
-          var count = item.work_count == null ? "" : " <span>" + escapeHtml(item.work_count + "张") + "</span>";
-          return '<button class="filter-chip" type="button" aria-pressed="' + pressed + '" data-competition-filter="' + escapeHtml(slug) + '">' + escapeHtml(item.name) + count + '</button>';
-        }).join("");
-        row.querySelectorAll("[data-competition-filter]").forEach(function (button) {
-          button.addEventListener("click", function () {
-            row.querySelectorAll("[data-competition-filter]").forEach(function (item) { item.setAttribute("aria-pressed", "false"); });
-            button.setAttribute("aria-pressed", "true");
-            var nextSlug = button.getAttribute("data-competition-filter") || "";
-            updateCompetitionUrl(nextSlug);
-            renderForCompetition(nextSlug);
-          });
-        });
-      }
-      return renderForCompetition(activeSlug);
-    });
-  }
-
   function updateCategoryHeader(cat, parent) {
     if (!cat) return;
     document.title = cat.name + " · 图物计划国展素材馆";
@@ -516,14 +538,39 @@
     });
   }
 
-  function renderSideNav(items) {
+  function navCode(cat, categories) {
+    if (!cat) return "";
+    var children = childCategories(categories || [], cat.id);
+    return (children[0] && children[0].code_prefix) || cat.code_prefix || ((cat.total_nb_images || cat.nb_images || 0) + "张");
+  }
+
+  function isMainArtworkCategory(cat) {
+    var name = categoryDisplayName(cat);
+    return ["国画", "油画", "版画", "雕塑", "漆画", "水彩", "农民画", "漫画"].indexOf(name) !== -1;
+  }
+
+  function renderSideNav(categories, current, parent) {
     var nav = app.querySelector(".side-nav");
-    if (!nav || !items.length) return;
-    var currentId = categoryIdFromUrl();
-    nav.innerHTML = items.map(function (cat) {
-      var active = sameId(cat.id, currentId) ? ' class="is-active"' : "";
-      return '<a' + active + ' href="' + escapeHtml(categoryHref(cat)) + '">' + escapeHtml(cat.name) + ' <span>' + escapeHtml((cat.total_nb_images || cat.nb_images || 0) + "张") + '</span></a>';
+    if (!nav || !current) return;
+    var parentCat = parent || current;
+    var currentItems = childCategories(categories, parentCat.id);
+    if (!currentItems.length) currentItems = [parentCat];
+    var activeId = current.id_uppercat ? current.id : (currentItems[0] && currentItems[0].id);
+    var currentLinks = currentItems.map(function (cat) {
+      var active = sameId(cat.id, activeId) ? ' class="is-active"' : "";
+      return '<a' + active + ' href="' + escapeHtml(categoryHref(cat)) + '">' + escapeHtml(cat.name) + ' <span>' + escapeHtml(navCode(cat, categories)) + '</span></a>';
     }).join("");
+
+    var otherLinks = "";
+    if (isMainArtworkCategory(parentCat)) {
+      otherLinks = topCategories(categories).filter(function (cat) {
+        return isMainArtworkCategory(cat) && !sameId(cat.id, parentCat.id);
+      }).map(function (cat) {
+        return '<a class="side-nav-secondary" href="' + escapeHtml(categoryHref(cat)) + '">' + escapeHtml(cat.name) + ' <span>' + escapeHtml(navCode(cat, categories)) + '</span></a>';
+      }).join("");
+    }
+
+    nav.innerHTML = '<span class="side-nav-label">当前分类</span>' + currentLinks + (otherLinks ? '<span class="side-nav-label">其他分类</span>' + otherLinks : "");
   }
 
   function renderCategoryFilters(children, currentCat, renderForCat) {
@@ -556,7 +603,7 @@
     var siblings = current.id_uppercat ? childCategories(categories, current.id_uppercat) : topCategories(categories);
 
     updateCategoryHeader(current, parent || current);
-    renderSideNav(children.length ? children : siblings);
+    renderSideNav(categories, current, parent || current);
 
     var gallery = app.querySelector("[data-category-gallery]");
     var pagination = app.querySelector("[data-pagination]");
@@ -709,8 +756,8 @@
     if (relatedTitle) relatedTitle.textContent = categoryText + "推荐";
 
     if (!category.id) return Promise.resolve(true);
-    return fetchImagePage({ catId: category.id, page: 0, perPage: 7, sort: "custom" }).then(function (result) {
-      var related = (result.images || []).filter(function (item) { return !sameId(item.id, imageId); }).slice(0, 6);
+    return fetchImagePage({ catId: category.id, page: 0, perPage: 9, sort: "custom" }).then(function (result) {
+      var related = (result.images || []).filter(function (item) { return !sameId(item.id, imageId); }).slice(0, 8);
       var grid = app.querySelector("[data-related-grid]");
       if (grid) grid.innerHTML = related.length ? related.map(function (item) { return renderWorkCard(item, categoryText); }).join("") : '<div class="empty-state">该分类更多作品正在整理中</div>';
       var nextLink = app.querySelector("[data-next-detail]");
@@ -741,7 +788,7 @@
     var cleanCode = code ? code[0].toUpperCase() : "ID-" + pictureIdFromUrl();
     var categoryLink = Array.prototype.slice.call(nativeRoot.querySelectorAll("a[href*='/category/']")).pop();
     var categoryText = categoryLink ? categoryLink.textContent.trim() : "作品分类";
-    var src = mainImage ? mainImage.src : root + "art-placeholder.svg";
+    var src = mainImage ? mainImage.src : root + "art-placeholder.svg?v=20260716-media-integrity-1";
     var desc = mainImage && mainImage.title ? mainImage.title : "可凭作品编号咨询高清素材与同类作品。";
 
     document.title = title + " · " + cleanCode;
@@ -762,8 +809,8 @@
 
     var catId = categoryIdFromUrl(categoryLink && categoryLink.href || window.location.href);
     if (catId) {
-      fetchImages({ catId: catId, perPage: 7 }).then(function (images) {
-        var related = images.filter(function (image) { return !sameId(image.id, pictureIdFromUrl()); }).slice(0, 6);
+      fetchImages({ catId: catId, perPage: 9 }).then(function (images) {
+        var related = images.filter(function (image) { return !sameId(image.id, pictureIdFromUrl()); }).slice(0, 8);
         var grid = app.querySelector("[data-related-grid]");
         if (grid) grid.innerHTML = related.map(function (image) { return renderWorkCard(image, categoryText); }).join("");
       });
@@ -775,7 +822,6 @@
     if (document.body.hasAttribute("data-detail-page")) return "detail";
     if (document.body.hasAttribute("data-category-page")) return "category";
     if (document.body.hasAttribute("data-search-page")) return "search";
-    if (document.body.hasAttribute("data-competition-page")) return "competition";
     if (params.get("gz_page") === "categories") return "categories";
     return "home";
   }
@@ -787,7 +833,6 @@
       if (page === "category") routeTask = applyCategory(categories);
       else if (page === "search") routeTask = applySearch();
       else if (page === "detail") routeTask = applyDetail();
-      else if (page === "competition") routeTask = applyCompetition();
       else routeTask = applyHome(categories);
       fetchContact().then(applyContact);
       return routeTask;

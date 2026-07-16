@@ -154,7 +154,7 @@ function ws_std_get_urls($image_row)
   if ( $src_image->is_original() )
   {// we have a photo
     global $user;
-    if ($user['enabled_high'])
+    if ($user['enabled_high'] && !is_a_guest())
     {
       $ret['element_url'] = $src_image->get_url();
       $provide_download_url = true;

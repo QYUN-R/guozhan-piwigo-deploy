@@ -155,6 +155,45 @@
     return cat && cat.id ? appUrl("category", { cat_id: cat.id }) : appUrl("categories");
   }
 
+  function createPageJump(pagination, onJump) {
+    if (!pagination || typeof onJump !== "function") return null;
+    var form = pagination.querySelector("[data-page-jump]");
+    if (!form) {
+      form = document.createElement("form");
+      form.className = "page-jump";
+      form.setAttribute("data-page-jump", "");
+      form.innerHTML = '<label><span>跳到</span><input class="page-jump-input" data-page-jump-input type="number" min="1" step="1" inputmode="numeric" aria-label="跳转页码"><span>页</span></label><button class="btn btn-secondary page-jump-button" type="submit" data-page-jump-submit>跳转</button>';
+      pagination.appendChild(form);
+    }
+    var input = form.querySelector("[data-page-jump-input]");
+    var submit = form.querySelector("[data-page-jump-submit]");
+    if (!input || !submit) return null;
+
+    form.onsubmit = function (event) {
+      event.preventDefault();
+      var maxPage = Math.max(1, parseInt(input.max, 10) || 1);
+      var rawPage = parseInt(input.value, 10);
+      if (!Number.isFinite(rawPage)) {
+        input.focus();
+        return;
+      }
+      var targetPage = Math.min(maxPage, Math.max(1, rawPage));
+      input.value = String(targetPage);
+      onJump(targetPage - 1);
+    };
+
+    return {
+      update: function (currentPage, totalPages, disabled) {
+        var safeTotal = Math.max(1, Number(totalPages) || 1);
+        var safeCurrent = Math.min(safeTotal, Math.max(1, Number(currentPage) + 1 || 1));
+        input.max = String(safeTotal);
+        if (document.activeElement !== input) input.value = String(safeCurrent);
+        input.disabled = Boolean(disabled) || safeTotal <= 1;
+        submit.disabled = Boolean(disabled) || safeTotal <= 1;
+      }
+    };
+  }
+
   function renderPager(container, pagination, items, pageSize, renderItem, unit) {
     if (!container || !pagination) return;
     var page = 0;
@@ -162,6 +201,11 @@
     var next = pagination.querySelector("[data-home-next], [data-page-next]");
     var status = pagination.querySelector("[data-home-status], [data-page-status]");
     var afterRender = typeof arguments[6] === "function" ? arguments[6] : null;
+    var jump = createPageJump(pagination, function (targetPage) {
+      page = targetPage;
+      draw();
+      container.scrollIntoView({ behavior: "smooth", block: "start" });
+    });
 
     function draw() {
       var total = Math.max(1, Math.ceil(items.length / pageSize));
@@ -173,6 +217,7 @@
       if (status) status.textContent = "第 " + (page + 1) + " / " + total + " 页 · 共 " + items.length + " " + (unit || "张");
       if (prev) prev.disabled = page === 0;
       if (next) next.disabled = page >= total - 1;
+      if (jump) jump.update(page, total, false);
     }
 
     if (prev) prev.onclick = function () {
@@ -201,12 +246,18 @@
     var prev = pagination.querySelector("[data-home-prev], [data-page-prev]");
     var next = pagination.querySelector("[data-home-next], [data-page-next]");
     var status = pagination.querySelector("[data-home-status], [data-page-status]");
+    var jump = createPageJump(pagination, function (targetPage) {
+      page = targetPage;
+      draw();
+      container.scrollIntoView({ behavior: "smooth", block: "start" });
+    });
 
     function draw() {
       if (!loader) return Promise.resolve();
       var currentRequest = ++requestId;
       container.setAttribute("aria-busy", "true");
       container.innerHTML = '<div class="empty-state">正在整理作品列表...</div>';
+      if (jump) jump.update(page, totalPages, true);
       return loader(page, pageSize).then(function (result) {
         if (currentRequest !== requestId) return;
         var items = result && result.images || [];
@@ -219,6 +270,7 @@
         if (status) status.textContent = "第 " + (page + 1) + " / " + totalPages + " 页 · 共 " + totalCount + " " + (unit || "张");
         if (prev) prev.disabled = page === 0;
         if (next) next.disabled = page >= totalPages - 1;
+        if (jump) jump.update(page, totalPages, false);
       }).catch(function () {
         if (currentRequest !== requestId) return;
         container.removeAttribute("aria-busy");
@@ -226,6 +278,7 @@
         if (status) status.textContent = "加载失败";
         if (prev) prev.disabled = true;
         if (next) next.disabled = true;
+        if (jump) jump.update(page, totalPages, true);
       });
     }
 

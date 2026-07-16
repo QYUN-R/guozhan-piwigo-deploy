@@ -499,7 +499,7 @@ CREATE TABLE `piwigo_user_infos` (
   `recent_period` tinyint(3) unsigned NOT NULL default '7',
   `theme` varchar(255) NOT NULL default 'modus',
   `registration_date` datetime NOT NULL default '1970-01-01 00:00:00',
-  `enabled_high` enum('true','false') NOT NULL default 'true',
+  `enabled_high` enum('true','false') NOT NULL default 'false',
   `level` tinyint unsigned NOT NULL default '0',
   `activation_key` varchar(255) default NULL,
   `activation_key_expire` datetime default NULL,

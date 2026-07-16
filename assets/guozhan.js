@@ -4,6 +4,8 @@
   const BRAND_NAME = "图物计划国展素材馆";
   const BRAND_EN = "AI Graphics Learning Plan";
   const WECHAT = "aiguozhanhuihua";
+  const HOME_PAGE_SIZE = 16;
+  const LIST_PAGE_SIZE = 16;
 
   const categories = {
     "ink-landscape": cat("国画", "山水画", "国画山水画", "GH-SS", ["山水", "云壑", "溪桥", "松石"]),
@@ -184,6 +186,10 @@
   function imageForCode(code) {
     const top = String(code || "").split("-")[0] || "YH";
     return assetPrefix() + "works/" + (workImages[top] || "mixed-material.jpg");
+  }
+
+  function processingImageUrl() {
+    return assetPrefix() + "art-placeholder.svg?v=20260716-media-integrity-1";
   }
 
   function padCode(index) {
@@ -523,6 +529,15 @@
   }
 
   function wireCommon() {
+    document.addEventListener("error", (event) => {
+      const image = event.target;
+      if (!(image instanceof HTMLImageElement) || image.getAttribute("data-api-image") !== "true") return;
+      if (image.getAttribute("data-processing-fallback") === "true") return;
+      image.setAttribute("data-processing-fallback", "true");
+      image.setAttribute("data-image-ready", "false");
+      image.src = processingImageUrl();
+    }, true);
+
     const menuToggle = document.querySelector("[data-menu-toggle]");
     const nav = document.querySelector("[data-nav]");
     if (menuToggle && nav) {
@@ -571,6 +586,45 @@
     });
   }
 
+  function createPageJump(pagination, onJump) {
+    if (!pagination || typeof onJump !== "function") return null;
+    let form = pagination.querySelector("[data-page-jump]");
+    if (!form) {
+      form = document.createElement("form");
+      form.className = "page-jump";
+      form.setAttribute("data-page-jump", "");
+      form.innerHTML = '<label><span>跳到</span><input class="page-jump-input" data-page-jump-input type="number" min="1" step="1" inputmode="numeric" aria-label="跳转页码"><span>页</span></label><button class="btn btn-secondary page-jump-button" type="submit" data-page-jump-submit>跳转</button>';
+      pagination.appendChild(form);
+    }
+    const input = form.querySelector("[data-page-jump-input]");
+    const submit = form.querySelector("[data-page-jump-submit]");
+    if (!input || !submit) return null;
+
+    form.onsubmit = (event) => {
+      event.preventDefault();
+      const maxPage = Math.max(1, parseInt(input.max, 10) || 1);
+      const rawPage = parseInt(input.value, 10);
+      if (!Number.isFinite(rawPage)) {
+        input.focus();
+        return;
+      }
+      const targetPage = Math.min(maxPage, Math.max(1, rawPage));
+      input.value = String(targetPage);
+      onJump(targetPage - 1);
+    };
+
+    return {
+      update(currentPage, totalPages, disabled) {
+        const safeTotal = Math.max(1, Number(totalPages) || 1);
+        const safeCurrent = Math.min(safeTotal, Math.max(1, Number(currentPage) + 1 || 1));
+        input.max = String(safeTotal);
+        if (document.activeElement !== input) input.value = String(safeCurrent);
+        input.disabled = Boolean(disabled) || safeTotal <= 1;
+        submit.disabled = Boolean(disabled) || safeTotal <= 1;
+      }
+    };
+  }
+
   function createPagedRenderer(options) {
     const { container, pagination, pageSize, renderItem, afterRender } = options;
     const emptyMessage = options.emptyMessage || "该栏目作品正在整理中";
@@ -580,6 +634,11 @@
     const status = pagination ? pagination.querySelector("[data-page-status], [data-home-status]") : null;
     let items = [];
     let page = 0;
+    const jump = createPageJump(pagination, (targetPage) => {
+      page = targetPage;
+      render();
+      if (container) container.scrollIntoView({ behavior: "smooth", block: "start" });
+    });
 
     function render() {
       if (!container) return;
@@ -591,6 +650,7 @@
       if (status) status.textContent = "第 " + (page + 1) + " / " + totalPages + " 页 · 共 " + items.length + " " + unit;
       if (prev) prev.disabled = page === 0;
       if (next) next.disabled = page >= totalPages - 1;
+      if (jump) jump.update(page, totalPages, false);
     }
 
     if (prev) prev.addEventListener("click", () => {
@@ -613,6 +673,80 @@
         render();
       }
     };
+  }
+
+  function createRemotePagedRenderer(options) {
+    const { container, pagination, pageSize, renderItem, fetchPage, afterRender, onPageLoaded } = options;
+    const emptyMessage = options.emptyMessage || "该栏目作品正在整理中";
+    const errorMessage = options.errorMessage || "作品加载失败，请稍后重试";
+    const unit = options.unit || "张";
+    const prev = pagination ? pagination.querySelector("[data-page-prev], [data-home-prev]") : null;
+    const next = pagination ? pagination.querySelector("[data-page-next], [data-home-next]") : null;
+    const status = pagination ? pagination.querySelector("[data-page-status], [data-home-status]") : null;
+    let page = 0;
+    let totalCount = 0;
+    let totalPages = 1;
+    let loading = false;
+    let generation = 0;
+    const jump = createPageJump(pagination, (targetPage) => {
+      if (loading) return;
+      loadPage(targetPage, true);
+    });
+
+    function updatePagination(message) {
+      if (status) status.textContent = message || ("第 " + (page + 1) + " / " + totalPages + " 页 · 共 " + totalCount + " " + unit);
+      if (prev) prev.disabled = loading || page <= 0;
+      if (next) next.disabled = loading || page >= totalPages - 1;
+      if (pagination) pagination.setAttribute("aria-busy", loading ? "true" : "false");
+      if (jump) jump.update(page, totalPages, loading);
+    }
+
+    async function loadPage(targetPage, scrollToContainer) {
+      if (!container) return;
+      const requestedPage = Math.max(0, Number(targetPage) || 0);
+      const expectedGeneration = ++generation;
+      let finalMessage = "";
+      loading = true;
+      container.setAttribute("aria-busy", "true");
+      updatePagination("正在加载第 " + (requestedPage + 1) + " 页…");
+
+      try {
+        const result = await fetchPage(requestedPage);
+        if (expectedGeneration !== generation) return;
+        const items = Array.isArray(result?.items) ? result.items : [];
+        totalCount = Math.max(0, Number(result?.totalCount ?? items.length) || 0);
+        totalPages = Math.max(1, Math.ceil(totalCount / pageSize));
+        page = Math.min(requestedPage, totalPages - 1);
+        container.innerHTML = items.length
+          ? items.map((item, index) => renderItem(item, index)).join("")
+          : '<div class="empty-state">' + emptyMessage + '</div>';
+        if (afterRender) afterRender(container);
+        if (onPageLoaded) onPageLoaded({ items, page, totalCount, totalPages });
+        if (scrollToContainer) container.scrollIntoView({ behavior: "smooth", block: "start" });
+      } catch (error) {
+        if (expectedGeneration !== generation) return;
+        console.error(options.errorLog || "Guozhan paged works API unavailable", error);
+        container.innerHTML = '<div class="empty-state">' + errorMessage + '</div>';
+        finalMessage = "作品加载失败";
+      } finally {
+        if (expectedGeneration === generation) {
+          loading = false;
+          container.setAttribute("aria-busy", "false");
+          updatePagination(finalMessage);
+        }
+      }
+    }
+
+    if (prev) prev.addEventListener("click", () => {
+      if (loading || page <= 0) return;
+      loadPage(page - 1, true);
+    });
+    if (next) next.addEventListener("click", () => {
+      if (loading || page >= totalPages - 1) return;
+      loadPage(page + 1, true);
+    });
+
+    return { loadPage };
   }
 
   function buildWork(data, key, index, scoreIndex) {
@@ -841,7 +975,7 @@
     document.querySelectorAll("[data-detail-category-link], [data-related-more], [data-back-list]").forEach((link) => link.setAttribute("href", categoryListHref(key)));
     const relatedTitle = document.querySelector("[data-related-title]");
     if (relatedTitle) relatedTitle.textContent = data.title + "推荐";
-    const related = buildWorks(data, key, 7).filter((item) => item.code !== code).slice(0, 6);
+    const related = buildWorks(data, key, 9).filter((item) => item.code !== code).slice(0, 8);
     const relatedGrid = document.querySelector("[data-related-grid]");
     if (relatedGrid) relatedGrid.innerHTML = related.map((item) => renderWorkCard(item)).join("");
   }
@@ -1376,6 +1510,7 @@
     const displayParentName = isCaaWork ? "中美协展览专项画稿" : parentName;
     const displayCategoryName = isCaaWork ? "" : categoryName;
     const displayMeta = [displayParentName, displayCategoryName].filter(Boolean).join(" / ");
+    const thumbDerivative = image.derivatives?.xsmall || image.derivatives?.thumb || image.derivatives?.square || null;
     const thumbUrl = normalizeUrl(image.thumbnail_url || bestDerivativeUrl(image.derivatives, ["xsmall", "small", "thumb", "square"]));
     const displayUrl = normalizeUrl(image.display_url || image.element_url || bestDerivativeUrl(image.derivatives, ["xlarge", "large", "medium", "small"]) || thumbUrl);
     const sortOrder = Number(image.sort_order || 0);
@@ -1398,6 +1533,8 @@
       hotScore: Number(image.hit || 0) + Number(image.download_count || 0),
       newestScore: timestamp,
       thumbUrl,
+      thumbWidth: Number(thumbDerivative?.width || image.width || 4),
+      thumbHeight: Number(thumbDerivative?.height || image.height || 3),
       displayUrl,
       raw: image
     };
@@ -1411,7 +1548,7 @@
     while (all.length < maxItems) {
       const result = await apiFetch("gzca.images.getList", {
         ...options,
-        per_page: API_PAGE_SIZE,
+        per_page: Math.min(API_PAGE_SIZE, maxItems - all.length),
         page
       });
       const images = result.images || [];
@@ -1429,20 +1566,27 @@
     return item.id ? href + "&image_id=" + encodeURIComponent(item.id) : href;
   }
 
-  function renderWorkCard(item, detailBase) {
+  function renderWorkCard(item, detailBase, renderOptions) {
+    const options = renderOptions || {};
     const href = item.href || (detailBase ? detailBase(item.code, item.key, item) : workDetailHref(item));
-    const imageSrc = item.thumbUrl || imageForCode(item.code);
+    const imageReady = Boolean(item.thumbUrl);
+    const imageSrc = item.thumbUrl || processingImageUrl();
+    const loading = options.eager ? "eager" : "lazy";
+    const fetchPriority = options.eager ? "high" : "auto";
+    const width = Math.max(1, Number(item.thumbWidth || 4));
+    const height = Math.max(1, Number(item.thumbHeight || 3));
     return '<a class="work-card" href="' + escapeHtml(href) + '" data-code="' + escapeHtml(item.code) + '"' + (item.id ? ' data-image-id="' + escapeHtml(item.id) + '"' : "") + '>' +
-      '<figure class="work-thumb"><span class="code-badge">' + escapeHtml(item.code) + '</span><img loading="lazy" decoding="async" data-api-image="' + (item.thumbUrl ? "true" : "false") + '" src="' + escapeHtml(imageSrc) + '" alt="' + escapeHtml(item.code) + '"></figure>' +
+      '<figure class="work-thumb"><span class="code-badge">' + escapeHtml(item.code) + '</span><img loading="' + loading + '" fetchpriority="' + fetchPriority + '" decoding="async" width="' + width + '" height="' + height + '" data-api-image="true" data-image-ready="' + (imageReady ? "true" : "false") + '" src="' + escapeHtml(imageSrc) + '" alt="' + escapeHtml(imageReady ? item.code : item.code + " 图片处理中") + '"></figure>' +
       '<div class="work-caption work-caption-compact"><p class="card-meta">' + escapeHtml(item.meta) + '</p><p class="work-code-line">作品编号：' + escapeHtml(item.code) + '</p></div>' +
     '</a>';
   }
 
   function renderResultCard(item) {
     const href = workDetailHref(item);
-    const imageSrc = item.thumbUrl || imageForCode(item.code);
+    const imageReady = Boolean(item.thumbUrl);
+    const imageSrc = item.thumbUrl || processingImageUrl();
     return '<article class="result-card" data-code="' + escapeHtml(item.code) + '">' +
-      '<a class="work-thumb" href="' + escapeHtml(href) + '"><span class="code-badge">' + escapeHtml(item.code) + '</span><img loading="lazy" decoding="async" data-api-image="' + (item.thumbUrl ? "true" : "false") + '" src="' + escapeHtml(imageSrc) + '" alt="' + escapeHtml(item.code) + '"></a>' +
+      '<a class="work-thumb" href="' + escapeHtml(href) + '"><span class="code-badge">' + escapeHtml(item.code) + '</span><img loading="lazy" decoding="async" data-api-image="true" data-image-ready="' + (imageReady ? "true" : "false") + '" src="' + escapeHtml(imageSrc) + '" alt="' + escapeHtml(imageReady ? item.code : item.code + " 图片处理中") + '"></a>' +
       '<div class="work-caption work-caption-compact"><p class="card-meta">' + escapeHtml(item.meta) + '</p><p class="work-code-line">作品编号：' + escapeHtml(item.code) + '</p></div>' +
       '<a class="btn btn-secondary" href="' + escapeHtml(href) + '">查看详情</a>' +
     '</article>';
@@ -1488,23 +1632,68 @@
     if (!body.hasAttribute("data-home-page")) return;
     const grid = document.querySelector("[data-home-stream]");
     const pagination = document.querySelector("[data-home-pagination]");
-    if (!grid || !pagination) return;
-    const pager = createPagedRenderer({ container: grid, pagination, pageSize: 16, renderItem: (item) => renderWorkCard(item), unit: "张" });
+    const previous = pagination?.querySelector("[data-home-prev]");
+    const next = pagination?.querySelector("[data-home-next]");
+    const status = pagination?.querySelector("[data-home-status]");
+    if (!grid || !pagination || !previous || !next || !status) return;
     let activeSort = document.querySelector('[data-home-sort][aria-pressed="true"]')?.getAttribute("data-home-sort") || "featured";
-    let activeFilter = "全部";
-    let works = [];
+    let pageNumber = 0;
+    let totalCount = 0;
+    let totalPages = 1;
+    let loading = false;
+    let generation = 0;
+    const jump = createPageJump(pagination, (targetPage) => {
+      if (loading) return;
+      loadPage(targetPage, true);
+    });
 
-    function apply() {
-      const filtered = works;
-      pager.setItems(sortedWorks(filtered, activeSort));
+    function updatePagination(message) {
+      status.textContent = message || ("第 " + (pageNumber + 1) + " / " + totalPages + " 页 · 共 " + totalCount + " 张");
+      previous.disabled = loading || pageNumber <= 0;
+      next.disabled = loading || pageNumber >= totalPages - 1;
+      pagination.setAttribute("aria-busy", loading ? "true" : "false");
+      if (jump) jump.update(pageNumber, totalPages, loading);
     }
 
-    try {
-      works = await fetchApiWorks({ sort: "featured" }, 80);
-      apply();
-    } catch (error) {
-      console.error("Guozhan works API unavailable", error);
-      pager.setItems([]);
+    async function loadPage(targetPage, scrollToGrid) {
+      const expectedGeneration = ++generation;
+      let finalMessage = "";
+      loading = true;
+      grid.setAttribute("aria-busy", "true");
+      updatePagination("正在加载第 " + (targetPage + 1) + " 页…");
+
+      try {
+        const result = await apiFetch("gzca.images.getList", {
+          sort: activeSort,
+          per_page: HOME_PAGE_SIZE,
+          page: targetPage
+        });
+        if (expectedGeneration !== generation) return;
+
+        const items = (result.images || []).map((image) => normalizeApiWork(image));
+        pageNumber = targetPage;
+        totalCount = Number(result.paging?.total_count ?? items.length);
+        totalPages = Math.max(1, Math.ceil(totalCount / HOME_PAGE_SIZE));
+        if (!items.length) {
+          grid.innerHTML = '<div class="empty-state">作品正在整理中</div>';
+        } else {
+          grid.innerHTML = items.map((item, index) => renderWorkCard(item, null, {
+            eager: index < 4
+          })).join("");
+        }
+        if (scrollToGrid) grid.scrollIntoView({ behavior: "smooth", block: "start" });
+      } catch (error) {
+        if (expectedGeneration !== generation) return;
+        console.error("Guozhan works API unavailable", error);
+        grid.innerHTML = '<div class="empty-state">作品加载失败，请稍后重试。</div>';
+        finalMessage = "作品加载失败";
+      } finally {
+        if (expectedGeneration === generation) {
+          loading = false;
+          grid.setAttribute("aria-busy", "false");
+          updatePagination(finalMessage);
+        }
+      }
     }
 
     document.querySelectorAll("[data-home-sort]").forEach((button) => {
@@ -1513,20 +1702,20 @@
         if (groupNode) groupNode.querySelectorAll("[data-home-sort]").forEach((item) => item.setAttribute("aria-pressed", "false"));
         button.setAttribute("aria-pressed", "true");
         activeSort = button.getAttribute("data-home-sort") || "featured";
-        apply();
+        loadPage(0, false);
       });
     });
-    if (body.hasAttribute("data-competition-page")) {
-      document.querySelectorAll("[data-filter-group] [data-filter]").forEach((button) => {
-        button.addEventListener("click", () => {
-          const groupNode = button.closest("[data-filter-group]");
-          if (groupNode) groupNode.querySelectorAll("[data-filter]").forEach((item) => item.setAttribute("aria-pressed", "false"));
-          button.setAttribute("aria-pressed", "true");
-          activeFilter = button.textContent.trim() || "全部";
-          apply();
-        });
-      });
-    }
+
+    previous.addEventListener("click", () => {
+      if (loading || pageNumber <= 0) return;
+      loadPage(pageNumber - 1, true);
+    });
+    next.addEventListener("click", () => {
+      if (loading || pageNumber >= totalPages - 1) return;
+      loadPage(pageNumber + 1, true);
+    });
+
+    loadPage(0, false);
   }
 
   async function applyCategoryPage() {
@@ -1534,8 +1723,6 @@
     const context = await getCategoryContext();
     const filterRow = document.querySelector("[data-filter-group]");
     const sortSelect = document.querySelector("[data-sort-select]");
-    const filters = context.isCaaBoard ? [] : (context.data.direct ? ["全部"] : ["全部"].concat(context.data.tags || []));
-    let allWorks = [];
     let currentSort = sortSelect?.value || "custom";
 
     document.title = context.title + " · " + BRAND_NAME;
@@ -1554,56 +1741,45 @@
       filterRow.innerHTML = "";
     }
 
-    const pager = createPagedRenderer({
+    const pager = createRemotePagedRenderer({
       container: document.querySelector("[data-category-gallery]"),
       pagination: document.querySelector("[data-pagination]"),
-      pageSize: 16,
-      renderItem: (item) => renderWorkCard(item),
+      pageSize: LIST_PAGE_SIZE,
+      renderItem: (item, index) => renderWorkCard(item, null, { eager: index < 4 }),
       emptyMessage: context.data.reserved ? "该专项展览作品正在整理中" : "未找到符合当前条件的作品",
-      unit: "张"
-    });
-
-    function update() {
-      const active = "全部";
-      const filtered = allWorks;
-      const sorted = sortedWorks(filtered, currentSort);
-      pager.setItems(sorted);
-      const status = document.querySelector("[data-filter-status]");
-      if (status) {
-        const singleNote = sorted.length <= 1 ? "（当前作品数量不足，排序结果不会明显变化）" : "";
-        status.textContent = "当前查看：" + (active || "全部") + " · 排序：" + sortLabel(currentSort) + singleNote;
-      }
-    }
-
-    async function reload() {
-      currentSort = sortSelect?.value || "custom";
-      update();
-      try {
-        const query = { sort: currentSort, recursive: true, fallbackKey: context.key };
+      unit: "张",
+      errorLog: "Guozhan category works API unavailable",
+      fetchPage: async (page) => {
+        const query = {
+          sort: currentSort,
+          recursive: true,
+          per_page: LIST_PAGE_SIZE,
+          page
+        };
         if (context.apiCategory?.id) {
           query.cat_id = context.apiCategory.id;
         }
         else if (context.isCaaBoard) query.query = "ZX-";
         else query.query = context.title;
-        allWorks = await fetchApiWorks(query, 100);
-      } catch (error) {
-        console.error("Guozhan category works API unavailable", error);
-        allWorks = [];
+        const result = await apiFetch("gzca.images.getList", query);
+        const items = (result.images || []).map((image) => normalizeApiWork(image, context.key));
+        return {
+          items,
+          totalCount: Number(result.paging?.total_count ?? items.length)
+        };
+      },
+      onPageLoaded: ({ totalCount }) => {
+        const status = document.querySelector("[data-filter-status]");
+        if (!status) return;
+        const singleNote = totalCount <= 1 ? "（当前作品数量不足，排序结果不会明显变化）" : "";
+        status.textContent = "当前查看：全部 · 排序：" + sortLabel(currentSort) + singleNote;
       }
-      update();
-    }
-
-    if (filterRow) {
-      filterRow.querySelectorAll("[data-filter]").forEach((button) => {
-        button.addEventListener("click", () => {
-          filterRow.querySelectorAll("[data-filter]").forEach((item) => item.setAttribute("aria-pressed", "false"));
-          button.setAttribute("aria-pressed", "true");
-          update();
-        });
-      });
-    }
-    sortSelect?.addEventListener("change", reload);
-    await reload();
+    });
+    sortSelect?.addEventListener("change", () => {
+      currentSort = sortSelect.value || "custom";
+      pager.loadPage(0, false);
+    });
+    await pager.loadPage(0, false);
   }
 
   async function applySearchPage() {
@@ -1612,21 +1788,29 @@
     document.querySelectorAll("[data-search-term]").forEach((node) => { node.textContent = query || "全部作品"; });
     const input = document.querySelector("[data-search-form] input[name='q']");
     if (input) input.value = query;
-    const pager = createPagedRenderer({
+    const pager = createRemotePagedRenderer({
       container: document.querySelector("[data-search-results]"),
       pagination: document.querySelector("[data-pagination]"),
-      pageSize: 16,
+      pageSize: LIST_PAGE_SIZE,
       renderItem: renderResultCard,
       emptyMessage: query ? "未找到该作品，可能已下架或不存在" : "暂无可展示作品",
-      unit: "条"
+      unit: "条",
+      errorLog: "Guozhan search API unavailable",
+      fetchPage: async (page) => {
+        const result = await apiFetch("gzca.images.getList", {
+          query,
+          sort: query ? "custom" : "featured",
+          per_page: LIST_PAGE_SIZE,
+          page
+        });
+        const items = (result.images || []).map((image) => normalizeApiWork(image));
+        return {
+          items,
+          totalCount: Number(result.paging?.total_count ?? items.length)
+        };
+      }
     });
-    try {
-      const works = await fetchApiWorks({ query, sort: query ? "custom" : "featured" }, 100);
-      pager.setItems(works);
-    } catch (error) {
-      console.error("Guozhan search API unavailable", error);
-      pager.setItems([]);
-    }
+    await pager.loadPage(0, false);
   }
 
   function setTextAll(selector, value) {
@@ -1644,7 +1828,7 @@
     setTextAll("[data-detail-desc]", "该作品当前未在前台公开展示。如需确认，请联系管理员在后台检查作品状态。");
     const mainImage = document.querySelector(".detail-art img");
     if (mainImage) {
-      mainImage.src = assetPrefix() + "art-placeholder.svg";
+      mainImage.src = processingImageUrl();
       mainImage.alt = "作品不可用";
       mainImage.removeAttribute("data-api-image");
     }
@@ -1699,9 +1883,11 @@
       setTextAll("[data-detail-desc]", work.desc || "作品已从后台数据库读取。");
       const mainImage = document.querySelector(".detail-art img");
       if (mainImage) {
-        mainImage.src = work.displayUrl || work.thumbUrl || imageForCode(work.code);
+        const imageReady = Boolean(work.displayUrl || work.thumbUrl);
+        mainImage.src = work.displayUrl || work.thumbUrl || processingImageUrl();
         mainImage.alt = work.title;
-        mainImage.setAttribute("data-api-image", work.displayUrl || work.thumbUrl ? "true" : "false");
+        mainImage.setAttribute("data-api-image", "true");
+        mainImage.setAttribute("data-image-ready", imageReady ? "true" : "false");
       }
       document.querySelectorAll("[data-detail-category-link], [data-related-more], [data-back-list]").forEach((link) => link.setAttribute("href", categoryListHref(work.key)));
       const relatedTitle = document.querySelector("[data-related-title]");
@@ -1711,8 +1897,8 @@
         relatedGrid.innerHTML = '<div class="empty-state">正在读取同类作品...</div>';
         try {
           const apiCategory = (await getApiCategories()).find((item) => item.key === work.key);
-          const related = await fetchApiWorks({ cat_id: apiCategory?.id, query: apiCategory ? "" : work.categoryName, sort: "featured", fallbackKey: work.key }, 7);
-          const filtered = related.filter((item) => String(item.id) !== String(work.id) && item.code !== work.code).slice(0, 6);
+          const related = await fetchApiWorks({ cat_id: apiCategory?.id, query: apiCategory ? "" : work.categoryName, sort: "featured", fallbackKey: work.key }, 9);
+          const filtered = related.filter((item) => String(item.id) !== String(work.id) && item.code !== work.code).slice(0, 8);
           relatedGrid.innerHTML = filtered.length ? filtered.map((item) => renderWorkCard(item)).join("") : '<div class="empty-state">暂无同类推荐作品。</div>';
         } catch (error) {
           console.warn("Guozhan related API unavailable", error);

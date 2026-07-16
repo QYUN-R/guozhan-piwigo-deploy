@@ -19,6 +19,7 @@ class GuozhanClientAdmin_maintain extends PluginMaintain
       'qr_path' => '',
       'restrict_administrators' => true,
       'frontend_sync' => true,
+      'watermark_enabled' => true,
       );
   }
 
@@ -168,6 +169,13 @@ CREATE TABLE IF NOT EXISTS `'.$admin_security_table.'` (
     if (empty($conf['gzca_config']))
     {
       conf_update_param('gzca_config', $this->default_config(), true, 'serialize');
+    }
+
+    if (defined('USER_INFOS_TABLE') && !empty($conf['guest_id']))
+    {
+      pwg_query(
+        "UPDATE ".USER_INFOS_TABLE." SET enabled_high = 'false' WHERE user_id = ".(int)$conf['guest_id'].";"
+        );
     }
   }
 
