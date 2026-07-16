@@ -1079,13 +1079,37 @@ function gzca_valid_prefix($value)
 
 function gzca_strip_markers($comment)
 {
-  $comment = preg_replace('/<!--\s*GZCA_(?:CODE|PREFIX|SAMPLE):.*?-->/is', '', (string)$comment);
+  $comment = preg_replace('/<!--\s*GZCA_(?:CODE|PREFIX|SAMPLE|SOURCE_SHA256):.*?-->/is', '', (string)$comment);
   return trim($comment);
+}
+
+function gzca_extract_source_sha256($comment)
+{
+  if (preg_match('/GZCA_SOURCE_SHA256:([a-f0-9]{64})(?=\s*(?:-->|$))/i', (string)$comment, $matches))
+  {
+    return strtolower($matches[1]);
+  }
+  return '';
+}
+
+function gzca_embed_source_sha256($comment, $sha256sum)
+{
+  $sha256sum = strtolower(trim((string)$sha256sum));
+  $code = gzca_extract_code($comment);
+  $prefix = '' !== $code ? '<!--GZCA_CODE:'.gzca_normalize_code($code).'-->' : '';
+  if (!preg_match('/^[a-f0-9]{64}$/', $sha256sum))
+  {
+    return $prefix.gzca_strip_markers($comment);
+  }
+  return $prefix.'<!--GZCA_SOURCE_SHA256:'.$sha256sum.'-->'.gzca_strip_markers($comment);
 }
 
 function gzca_embed_code($comment, $code)
 {
-  return '<!--GZCA_CODE:'.gzca_normalize_code($code).'-->'.gzca_strip_markers($comment);
+  $source_sha256 = gzca_extract_source_sha256($comment);
+  return '<!--GZCA_CODE:'.gzca_normalize_code($code).'-->'
+    .('' !== $source_sha256 ? '<!--GZCA_SOURCE_SHA256:'.$source_sha256.'-->' : '')
+    .gzca_strip_markers($comment);
 }
 
 function gzca_embed_sample_code($comment, $code, $sample_key)
@@ -2554,33 +2578,89 @@ function gzca_upload_batch_limits()
     );
 }
 
-function gzca_find_duplicate_upload($filepath)
+function gzca_find_duplicate_upload($filepath, $sha256sum=null)
 {
   if (!is_file($filepath))
   {
     return null;
   }
 
-  $md5sum = @md5_file($filepath);
-  if (false === $md5sum || !preg_match('/^[a-f0-9]{32}$/', $md5sum))
+  $sha256sum = null === $sha256sum ? @hash_file('sha256', $filepath) : strtolower(trim((string)$sha256sum));
+  if (false === $sha256sum || !preg_match('/^[a-f0-9]{64}$/', $sha256sum))
   {
     return null;
   }
 
+  $marker = '<!--GZCA_SOURCE_SHA256:'.$sha256sum.'-->';
   $result = pwg_query('
+SELECT i.id AS image_id, i.comment, gw.code
+  FROM '.IMAGES_TABLE.' AS i
+  LEFT JOIN '.GZCA_WORKS_TABLE.' AS gw ON gw.image_id = i.id
+  WHERE LOCATE(\''.pwg_db_real_escape_string($marker).'\', COALESCE(i.comment, \'\')) > 0
+  ORDER BY i.id ASC
+;');
+  $row = null;
+  while ($candidate = pwg_db_fetch_assoc($result))
+  {
+    $source = gzca_uploaded_image_source_state((int)$candidate['image_id']);
+    if (!empty($source['ready']))
+    {
+      $row = $candidate;
+      break;
+    }
+  }
+
+  if (null === $row)
+  {
+    $md5sum = @md5_file($filepath);
+    $filesize = @filesize($filepath);
+    if (
+      false !== $md5sum
+      && preg_match('/^[a-f0-9]{32}$/', $md5sum)
+      && false !== $filesize
+      )
+    {
+      $legacy_result = pwg_query('
 SELECT i.id AS image_id, i.comment, gw.code
   FROM '.IMAGES_TABLE.' AS i
   LEFT JOIN '.GZCA_WORKS_TABLE.' AS gw ON gw.image_id = i.id
   WHERE i.md5sum = \''.pwg_db_real_escape_string($md5sum).'\'
   ORDER BY i.id ASC
-  LIMIT 1
 ;');
-  if (0 === pwg_db_num_rows($result))
+      while ($candidate = pwg_db_fetch_assoc($legacy_result))
+      {
+        if ('' !== gzca_extract_source_sha256($candidate['comment']))
+        {
+          continue;
+        }
+        $source = gzca_uploaded_image_source_state((int)$candidate['image_id']);
+        if (
+          empty($source['ready'])
+          || !is_file($source['path'])
+          || (int)@filesize($source['path']) !== (int)$filesize
+          )
+        {
+          continue;
+        }
+        $candidate_sha256 = @hash_file('sha256', $source['path']);
+        if (
+          false !== $candidate_sha256
+          && preg_match('/^[a-f0-9]{64}$/', $candidate_sha256)
+          && hash_equals($sha256sum, $candidate_sha256)
+          )
+        {
+          $row = $candidate;
+          break;
+        }
+      }
+    }
+  }
+
+  if (null === $row)
   {
     return null;
   }
 
-  $row = pwg_db_fetch_assoc($result);
   $image_id = (int)$row['image_id'];
   $code = gzca_normalize_code(isset($row['code']) ? $row['code'] : '');
   if ('' === $code)
@@ -2723,12 +2803,16 @@ function gzca_upload_works_batch(
     'uploaded' => 0,
     'uploaded_ids' => array(),
     'uploaded_codes' => array(),
+    'skipped_duplicates' => 0,
+    'duplicate_files' => array(),
+    'notices' => array(),
     'compressed_count' => 0,
     'compressed_saved_bytes' => 0,
     'verified_sources' => 0,
     'derivatives_expected' => 0,
     'derivatives_generated' => 0,
     'public_derivatives_ready' => 0,
+    'watermark_failed' => 0,
     'category_path' => '',
     'message' => '',
     'watermark_enabled' => false,
@@ -2799,9 +2883,16 @@ function gzca_upload_works_batch(
       continue;
     }
 
+    $source_sha256 = @hash_file('sha256', $file['tmp_name']);
+    if (false === $source_sha256 || !preg_match('/^[a-f0-9]{64}$/', $source_sha256))
+    {
+      $errors[] = '文件“'.htmlspecialchars($file_name, ENT_QUOTES, 'UTF-8').'”无法完成内容哈希校验，已停止上传以避免错误判重。';
+      continue;
+    }
+
     $compression_info = array();
     $prepared_upload = gzca_prepare_upload_image_file($file['tmp_name'], $file_name, $compression_info);
-    $duplicate = gzca_find_duplicate_upload($prepared_upload['filepath']);
+    $duplicate = gzca_find_duplicate_upload($file['tmp_name'], $source_sha256);
     if (null !== $duplicate)
     {
       if (!empty($prepared_upload['compressed']) && is_file($prepared_upload['filepath']))
@@ -2809,12 +2900,18 @@ function gzca_upload_works_batch(
         @unlink($prepared_upload['filepath']);
       }
 
-      $duplicate_code = htmlspecialchars($duplicate['code'], ENT_QUOTES, 'UTF-8');
+      $duplicate_code = $duplicate['code'];
       $duplicate_categories = empty($duplicate['category_paths'])
         ? '图库中的现有板块'
         : implode('、', $duplicate['category_paths']);
       $target_category = gzca_category_path($album_id);
-      $errors[] = '文件“'.htmlspecialchars($file_name, ENT_QUOTES, 'UTF-8').'”与已有作品“'.$duplicate_code.'”相同，已有作品所属板块：“'.htmlspecialchars($duplicate_categories, ENT_QUOTES, 'UTF-8').'”。本次未上传，也未关联到“'.htmlspecialchars($target_category, ENT_QUOTES, 'UTF-8').'”。';
+      $result['skipped_duplicates']++;
+      $result['duplicate_files'][] = array(
+        'name' => $file_name,
+        'existing_code' => $duplicate_code,
+        'existing_categories' => $duplicate['category_paths'],
+        );
+      $result['notices'][] = '文件“'.$file_name.'”与已有作品“'.$duplicate_code.'”的内容哈希一致，已安全跳过；已有作品所属板块：“'.$duplicate_categories.'”。本次不会占用新编号，也不会重复关联到“'.$target_category.'”。';
       continue;
     }
 
@@ -2824,6 +2921,9 @@ function gzca_upload_works_batch(
       $result['compressed_saved_bytes'] += max(0, (int)$prepared_upload['original_bytes'] - (int)$prepared_upload['final_bytes']);
     }
 
+    $had_duplicate_setting = array_key_exists('upload_detect_duplicate', $conf);
+    $previous_duplicate_setting = $had_duplicate_setting ? $conf['upload_detect_duplicate'] : null;
+    $conf['upload_detect_duplicate'] = false;
     try
     {
       $image_id = add_uploaded_file(
@@ -2841,6 +2941,17 @@ function gzca_upload_works_batch(
       }
       $errors[] = '文件“'.htmlspecialchars($file_name, ENT_QUOTES, 'UTF-8').'”写入图库时发生异常，未创建作品记录。';
       continue;
+    }
+    finally
+    {
+      if ($had_duplicate_setting)
+      {
+        $conf['upload_detect_duplicate'] = $previous_duplicate_setting;
+      }
+      else
+      {
+        unset($conf['upload_detect_duplicate']);
+      }
     }
 
     if (empty($image_id))
@@ -2876,7 +2987,7 @@ function gzca_upload_works_batch(
         IMAGES_TABLE,
         array(
           'name' => $title,
-          'comment' => gzca_embed_code('', $code),
+          'comment' => gzca_embed_source_sha256(gzca_embed_code('', $code), $source_sha256),
           'level' => $publish_now ? 0 : 8,
           ),
         array('id' => (int)$image_id)
@@ -2904,6 +3015,7 @@ function gzca_upload_works_batch(
         );
     if (!$derivatives_ready)
     {
+      $result['watermark_failed'] = count($result['uploaded_ids']);
       foreach ($result['uploaded_ids'] as $uploaded_image_id)
       {
         single_update(IMAGES_TABLE, array('level' => 8), array('id' => (int)$uploaded_image_id));
@@ -2939,10 +3051,18 @@ function gzca_upload_works_batch(
     $code_summary = empty($result['uploaded_codes'])
       ? ''
       : '，编号 '.reset($result['uploaded_codes']).(count($result['uploaded_codes']) > 1 ? ' 至 '.end($result['uploaded_codes']) : '');
+    $duplicate_summary = $result['skipped_duplicates'] > 0
+      ? '，另按内容哈希跳过 '.$result['skipped_duplicates'].' 个完全相同副本'
+      : '';
     $watermark_summary = $result['watermark_enabled']
       ? ($derivatives_ready ? '，前台水印展示图已全部生成并验证' : '，水印展示图生成不完整，作品已自动下架')
       : '，当前前台水印已关闭';
-    $result['message'] = '已上传 '.$result['uploaded'].' 张作品到“'.$result['category_path'].'”'.$code_summary.$watermark_summary.'。';
+    $result['message'] = '已上传 '.$result['uploaded'].' 张作品到“'.$result['category_path'].'”'.$code_summary.$duplicate_summary.$watermark_summary.'。';
+  }
+  elseif ($result['skipped_duplicates'] > 0)
+  {
+    $result['category_path'] = gzca_category_path($album_id);
+    $result['message'] = '未新增重复作品；已按内容哈希跳过 '.$result['skipped_duplicates'].' 个完全相同副本。现有作品、分类和编号均保持不变。';
   }
 
   return $result;

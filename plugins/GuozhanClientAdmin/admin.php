@@ -270,13 +270,18 @@ if ('upload_works' === $action)
     }
     header('Content-Type: application/json; charset=utf-8');
     echo json_encode(array(
-      'ok' => empty($upload_errors) && $upload_result['uploaded'] > 0,
+      'ok' => empty($upload_errors)
+        && ($upload_result['uploaded'] > 0 || $upload_result['skipped_duplicates'] > 0),
       'uploaded' => $upload_result['uploaded'],
       'codes' => $upload_result['uploaded_codes'],
+      'skipped_duplicates' => $upload_result['skipped_duplicates'],
+      'duplicate_files' => $upload_result['duplicate_files'],
+      'notices' => $upload_result['notices'],
       'message' => $upload_result['message'],
       'compressed_count' => $upload_result['compressed_count'],
       'compressed_saved' => gzca_format_bytes($upload_result['compressed_saved_bytes']),
       'watermark_enabled' => $upload_result['watermark_enabled'],
+      'watermark_failed' => $upload_result['watermark_failed'],
       'errors' => $upload_errors,
       ), JSON_UNESCAPED_UNICODE);
     exit;
@@ -287,7 +292,12 @@ if ('upload_works' === $action)
     $page['errors'][] = $upload_error;
   }
 
-  if ($upload_result['uploaded'] > 0)
+  foreach ($upload_result['notices'] as $upload_notice)
+  {
+    $page['infos'][] = htmlspecialchars($upload_notice, ENT_QUOTES, 'UTF-8');
+  }
+
+  if ($upload_result['uploaded'] > 0 || $upload_result['skipped_duplicates'] > 0)
   {
     $page['infos'][] = htmlspecialchars($upload_result['message'], ENT_QUOTES, 'UTF-8');
     if ($upload_result['compressed_count'] > 0)
@@ -310,7 +320,8 @@ if ('save_work' === $action)
   $sort_order = isset($_POST['sort_order']) ? (int)$_POST['sort_order'] : 0;
   $download_count = isset($_POST['download_count']) ? max(0, (int)$_POST['download_count']) : 0;
 
-  if (null === gzca_find_image($image_id))
+  $existing_work = gzca_find_image($image_id);
+  if (null === $existing_work)
   {
     $page['errors'][] = '作品不存在或已被删除。';
   }
@@ -336,7 +347,10 @@ if ('save_work' === $action)
       IMAGES_TABLE,
       array(
         'name' => $title,
-        'comment' => gzca_embed_code($description, $code),
+        'comment' => gzca_embed_source_sha256(
+          gzca_embed_code($description, $code),
+          gzca_extract_source_sha256(isset($existing_work['comment']) ? $existing_work['comment'] : '')
+          ),
         'level' => 'public' === $visibility ? 0 : 8,
         ),
       array('id' => $image_id)
